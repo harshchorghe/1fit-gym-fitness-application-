@@ -1,16 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';   // Correct import for App Router
 
 export default function GymLandingPage() {
   const [scrollY, setScrollY] = useState(0);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const router = useRouter();
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const goToSignup = () => {
+    router.push('/signup');
+  };
 
   const features = [
     { icon: '💪', title: 'Strength Training', desc: 'Build raw power with state-of-the-art equipment' },
@@ -143,7 +150,10 @@ export default function GymLandingPage() {
               ))}
             </div>
 
-            <button className="hidden md:block bg-red-500 hover:bg-red-600 px-6 py-3 rounded-none font-semibold transition-all transform hover:scale-105">
+            <button 
+              onClick={goToSignup}
+              className="hidden md:block bg-red-500 hover:bg-red-600 px-6 py-3 rounded-none font-semibold transition-all transform hover:scale-105"
+            >
               JOIN NOW
             </button>
 
@@ -177,7 +187,13 @@ export default function GymLandingPage() {
                   {item}
                 </a>
               ))}
-              <button className="w-full bg-red-500 hover:bg-red-600 px-6 py-3 rounded-none font-semibold transition-all">
+              <button 
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  goToSignup();
+                }}
+                className="w-full bg-red-500 hover:bg-red-600 px-6 py-3 rounded-none font-semibold transition-all"
+              >
                 JOIN NOW
               </button>
             </div>
@@ -208,7 +224,10 @@ export default function GymLandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-in stagger-2">
-            <button className="bg-red-500 hover:bg-red-600 px-8 py-4 text-lg font-bold rounded-none transition-all transform hover:scale-105 hover:shadow-lg hover:shadow-red-500/50">
+            <button 
+              onClick={goToSignup}
+              className="bg-red-500 hover:bg-red-600 px-8 py-4 text-lg font-bold rounded-none transition-all transform hover:scale-105 hover:shadow-lg hover:shadow-red-500/50"
+            >
               START YOUR JOURNEY
             </button>
             <button className="border-2 border-white hover:bg-white hover:text-black px-8 py-4 text-lg font-bold rounded-none transition-all transform hover:scale-105">
@@ -279,7 +298,10 @@ export default function GymLandingPage() {
           <p className="text-lg sm:text-xl md:text-2xl mb-8 opacity-90">
             No commitment. No excuses. Just results.
           </p>
-          <button className="bg-black hover:bg-gray-900 text-white px-8 py-4 text-lg font-bold rounded-none transition-all transform hover:scale-105">
+          <button 
+            onClick={goToSignup}
+            className="bg-black hover:bg-gray-900 text-white px-8 py-4 text-lg font-bold rounded-none transition-all transform hover:scale-105"
+          >
             CLAIM YOUR TRIAL
           </button>
         </div>
@@ -324,7 +346,10 @@ export default function GymLandingPage() {
                   ))}
                 </ul>
 
-                <button className={`w-full py-4 font-bold transition-all ${plan.popular ? 'bg-red-500 hover:bg-red-600' : 'bg-transparent border-2 border-gray-700 hover:border-red-500 hover:bg-red-500'}`}>
+                <button 
+                  onClick={goToSignup}
+                  className={`w-full py-4 font-bold transition-all ${plan.popular ? 'bg-red-500 hover:bg-red-600' : 'bg-transparent border-2 border-gray-700 hover:border-red-500 hover:bg-red-500'}`}
+                >
                   SELECT PLAN
                 </button>
               </div>
@@ -373,7 +398,8 @@ export default function GymLandingPage() {
             ></textarea>
 
             <button 
-              type="submit"
+              type="button"  // Changed from submit → button since we're redirecting
+              onClick={goToSignup}
               className="w-full bg-red-500 hover:bg-red-600 py-4 font-bold text-lg transition-all transform hover:scale-105"
             >
               SUBMIT APPLICATION
