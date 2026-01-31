@@ -1,8 +1,5 @@
-import Dashboard from "@/components/dashboard/home";
-export default function HomeDashboard() {
-  return <Dashboard />;
-}
+import { redirect } from 'next/navigation';
 
-export const metadata = {
-  title: 'Dashboard | IronForge',
-};
+export default function HomePage() {
+  redirect('/home/overview');
+}
