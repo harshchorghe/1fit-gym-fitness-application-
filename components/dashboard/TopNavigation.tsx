@@ -1,10 +1,14 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+
 interface TopNavigationProps {
   onMenuClick: () => void;
 }
 
 export default function TopNavigation({ onMenuClick }: TopNavigationProps) {
+  const router = useRouter();
+  
   const user = {
     name: 'Alex Thompson',
     membershipType: 'Pro',
@@ -25,7 +29,11 @@ export default function TopNavigation({ onMenuClick }: TopNavigationProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <div className="text-2xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>
+            <div 
+              className="text-2xl font-bold cursor-pointer" 
+              style={{ fontFamily: 'Oswald, sans-serif' }}
+              onClick={() => router.push('/home/overview')}
+            >
               <span className="text-white">IRON</span>
               <span className="text-red-500">FORGE</span>
             </div>
@@ -42,7 +50,10 @@ export default function TopNavigation({ onMenuClick }: TopNavigationProps) {
             </button>
 
             {/* User Profile */}
-            <div className="flex items-center space-x-3 p-2 hover:bg-gray-900 rounded-lg transition-colors cursor-pointer">
+            <div 
+              className="flex items-center space-x-3 p-2 hover:bg-gray-900 rounded-lg transition-colors cursor-pointer"
+              onClick={() => router.push('/profile')}
+            >
               <div className="text-3xl">{user.image}</div>
               <div className="hidden sm:block text-left">
                 <div className="text-sm font-semibold">{user.name}</div>

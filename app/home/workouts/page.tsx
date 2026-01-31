@@ -1,10 +1,11 @@
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import PlaceholderScreen from '@/components/screens/PlaceholderScreen';
+import WorkoutsScreen from '@/components/screens/WorkoutScreen';
+
 
 export default function WorkoutsPage() {
   return (
     <DashboardLayout>
-      <PlaceholderScreen title="Workouts" />
+      <WorkoutsScreen />
     </DashboardLayout>
   );
 }

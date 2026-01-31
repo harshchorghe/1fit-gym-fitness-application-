@@ -1,10 +1,10 @@
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import PlaceholderScreen from '@/components/screens/PlaceholderScreen';
+import NutritionScreen from '@/components/screens/NutritionScreen';
 
 export default function NutritionPage() {
   return (
     <DashboardLayout>
-      <PlaceholderScreen title="Nutrition" />
+      <NutritionScreen />
     </DashboardLayout>
   );
 }

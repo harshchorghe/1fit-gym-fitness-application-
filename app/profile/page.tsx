@@ -1,10 +1,10 @@
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import ClassesScreen from '@/components/screens/ClassesScreen';
+import ProfileScreen from '@/components/screens/ProfileScreen';
 
-export default function ClassesPage() {
+export default function ProfilePage() {
   return (
     <DashboardLayout>
-      <ClassesScreen />
+      <ProfileScreen />
     </DashboardLayout>
   );
 }

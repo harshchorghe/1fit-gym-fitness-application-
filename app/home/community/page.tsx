@@ -1,10 +1,10 @@
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import PlaceholderScreen from '@/components/screens/PlaceholderScreen';
+import CommunityScreen from '@/components/screens/CommunityScreen';
 
 export default function CommunityPage() {
   return (
     <DashboardLayout>
-      <PlaceholderScreen title="Community" />
+      <CommunityScreen />
     </DashboardLayout>
   );
 }

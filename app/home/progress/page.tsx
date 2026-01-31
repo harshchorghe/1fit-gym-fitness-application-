@@ -1,10 +1,10 @@
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import PlaceholderScreen from '@/components/screens/PlaceholderScreen';
+import ProgressScreen from '@/components/screens/ProgressScreen';
 
 export default function ProgressPage() {
   return (
     <DashboardLayout>
-      <PlaceholderScreen title="Progress" />
+      <ProgressScreen />
     </DashboardLayout>
   );
 }

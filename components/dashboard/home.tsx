@@ -153,8 +153,8 @@ export default function Dashboard() {
                 </svg>
               </button>
               <div className="text-2xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                <span className="text-white">IRON</span>
-                <span className="text-red-500">FORGE</span>
+                <span className="text-white">1</span>
+                <span className="text-red-500">FIT</span>
               </div>
             </div>
 

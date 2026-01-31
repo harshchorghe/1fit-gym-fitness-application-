@@ -21,7 +21,8 @@ export default function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
     { name: 'Classes', icon: '📅', path: '/home/classes' },
     { name: 'Progress', icon: '📈', path: '/home/progress' },
     { name: 'Nutrition', icon: '🥗', path: '/home/nutrition' },
-    { name: 'Community', icon: '👥', path: '/home/community' }
+    { name: 'Community', icon: '👥', path: '/home/community' },
+    { name: 'Profile', icon: '👤', path: '/profile' }
   ];
 
   const handleNavigation = (path: string) => {

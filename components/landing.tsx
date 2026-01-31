@@ -133,8 +133,8 @@ export default function GymLandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="text-3xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>
-              <span className="text-white">IRON</span>
-              <span className="text-red-500">FORGE</span>
+              <span className="text-white">1</span>
+              <span className="text-red-500">FIT</span>
             </div>
 
             {/* Desktop Menu */}
@@ -414,7 +414,7 @@ export default function GymLandingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
             <div>
               <h3 className="text-2xl font-bold mb-4" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                <span className="text-white">IRON</span><span className="text-red-500">FORGE</span>
+                <span className="text-white">1</span><span className="text-red-500">FIT</span>
               </h3>
               <p className="text-gray-500 text-sm">Building champions since 2020</p>
             </div>
@@ -451,7 +451,7 @@ export default function GymLandingPage() {
 
           <div className="border-t border-gray-900 pt-8 flex flex-col sm:flex-row justify-between items-center">
             <p className="text-gray-500 text-sm mb-4 sm:mb-0">
-              © 2026 IronForge Fitness. All rights reserved.
+              © 2026 1FIT Fitness. All rights reserved.
             </p>
             <div className="flex space-x-6">
               {['Facebook', 'Instagram', 'Twitter', 'YouTube'].map((social) => (
