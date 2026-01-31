@@ -7,7 +7,18 @@ import Link from 'next/link';
 export default function SignUpPage() {
   const router = useRouter();
 
-  const [formData, setFormData] = useState({
+  type SignUpFormData = {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    password: string;
+    confirmPassword: string;
+    membershipType: string;
+    agreeToTerms: boolean;
+  };
+
+  const [formData, setFormData] = useState<SignUpFormData>({
     firstName: '',
     lastName: '',
     email: '',
@@ -26,14 +37,19 @@ export default function SignUpPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type, checked } = e.target;
+    const target = e.target as HTMLInputElement | HTMLSelectElement;
+    const name = target.name;
+    const value = target.value;
+    const isCheckbox = (target as HTMLInputElement).type === 'checkbox';
+    const checked = isCheckbox ? (target as HTMLInputElement).checked : false;
+
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+      [name]: isCheckbox ? checked : value,
+    } as unknown as SignUpFormData));
 
     // Clear error when user starts typing again
-    if (errors[name]) {
+    if ((errors as Record<string, string>)[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
     }
   };
@@ -92,8 +108,12 @@ export default function SignUpPage() {
         router.push('/home');
       }, 1800);
 
-    } catch (err: any) {
-      setSubmitError(err.message || 'Something went wrong. Please try again.');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setSubmitError(err.message || 'Something went wrong. Please try again.');
+      } else {
+        setSubmitError(String(err) || 'Something went wrong. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

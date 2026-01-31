@@ -1,10 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
+
+// Types used across modal views
+type Category = {
+  id: number;
+  name: string;
+  icon: React.ReactNode;
+  count: number;
+  color: string;
+};
+
+type DetailedWorkout = {
+  id: number;
+  name: string;
+  duration: string;
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced' | string;
+  calories: number;
+  equipment: string[];
+  trainer?: string;
+  rating?: number | string;
+};
+
+type MyWorkout = {
+  id: number;
+  name: string;
+  exercises: number;
+  lastDone: string;
+  isFavorite: boolean;
+};
+
+type ModalType = 'category' | 'workout' | 'myWorkout' | 'quickStart' | 'custom' | 'goals' | 'progress';
+type ModalState = { type: ModalType; payload: any } | null;
 
 // ─── MODAL / TAB VIEWS ───────────────────────────────────────────────────────
 
-function CategoryDetailView({ category, onClose }) {
+function CategoryDetailView({ category, onClose }: { category: Category; onClose?: () => void }) {
   const sampleExercises = [
     { name: 'Exercise 1', duration: '3 min', level: 'Beginner' },
     { name: 'Exercise 2', duration: '5 min', level: 'Intermediate' },
@@ -67,7 +98,7 @@ function CategoryDetailView({ category, onClose }) {
   );
 }
 
-function WorkoutDetailView({ workout, onClose }) {
+function WorkoutDetailView({ workout, onClose }: { workout: DetailedWorkout; onClose?: () => void }) {
   const [started, setStarted] = useState(false);
 
   const exercises = [
@@ -164,7 +195,7 @@ function WorkoutDetailView({ workout, onClose }) {
   );
 }
 
-function MyWorkoutDetailView({ workout, onClose }) {
+function MyWorkoutDetailView({ workout, onClose }: { workout: MyWorkout; onClose?: () => void }) {
   const exercises = Array.from({ length: workout.exercises }, (_, i) => ({
     name: `Exercise ${i + 1}`,
     sets: 3,
@@ -221,8 +252,8 @@ function MyWorkoutDetailView({ workout, onClose }) {
   );
 }
 
-function QuickStartView({ onClose }) {
-  const [selectedType, setSelectedType] = useState(null);
+function QuickStartView({ onClose }: { onClose?: () => void }) {
+  const [selectedType, setSelectedType] = useState<string | null>(null);
   const types = [
     { id: 'upper', label: 'Upper Body', icon: '💪', duration: '30 min' },
     { id: 'lower', label: 'Lower Body', icon: '🦵', duration: '35 min' },
@@ -259,9 +290,9 @@ function QuickStartView({ onClose }) {
   );
 }
 
-function CustomWorkoutView({ onClose }) {
+function CustomWorkoutView({ onClose }: { onClose?: () => void }) {
   const [name, setName] = useState('');
-  const [exercises, setExercises] = useState([{ name: '' }]);
+  const [exercises, setExercises] = useState<{ name: string }[]>([{ name: '' }]);
 
   return (
     <div className="space-y-6">
@@ -319,14 +350,14 @@ function CustomWorkoutView({ onClose }) {
   );
 }
 
-function SetGoalsView({ onClose }) {
+function SetGoalsView({ onClose }: { onClose?: () => void }) {
   const goals = [
     { icon: '⚖️', label: 'Lose Weight', desc: 'Burn calories & get lean' },
     { icon: '💪', label: 'Build Muscle', desc: 'Strength & hypertrophy' },
     { icon: '🏃', label: 'Improve Endurance', desc: 'Cardio & stamina' },
     { icon: '🧘', label: 'Flexibility', desc: 'Stretch & recover' },
   ];
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState<number | null>(null);
 
   return (
     <div className="space-y-6">
@@ -357,7 +388,7 @@ function SetGoalsView({ onClose }) {
   );
 }
 
-function TrackProgressView({ onClose }) {
+function TrackProgressView({ onClose }: { onClose?: () => void }) {
   const weekData = [
     { day: 'Mon', workouts: 1, calories: 420 },
     { day: 'Tue', workouts: 0, calories: 0 },
@@ -417,7 +448,7 @@ function TrackProgressView({ onClose }) {
 
 // ─── MODAL WRAPPER ───────────────────────────────────────────────────────────
 
-function Modal({ title, onClose, children }) {
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
       <div className="bg-gray-950 border border-gray-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -439,9 +470,9 @@ function Modal({ title, onClose, children }) {
 
 export default function WorkoutsScreen() {
   // Modal state: { type, payload }
-  const [modal, setModal] = useState(null);
+  const [modal, setModal] = useState<ModalState>(null);
 
-  const openModal = (type, payload = null) => setModal({ type, payload });
+  const openModal = (type: ModalType, payload: any = null) => setModal({ type, payload });
   const closeModal = () => setModal(null);
 
   const workoutCategories = [
@@ -482,11 +513,11 @@ export default function WorkoutsScreen() {
     }
   };
 
-  const modalTitles = {
+  const modalTitles: Record<ModalType, string> = {
     category:  modal?.payload?.name || '',
     workout:   modal?.payload?.name || '',
     myWorkout: modal?.payload?.name || '',
-    quickStart:'Quick Start',
+    quickStart: 'Quick Start',
     custom:    'Custom Workout',
     goals:     'Set Goals',
     progress:  'Track Progress',

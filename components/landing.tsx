@@ -393,7 +393,7 @@ export default function GymLandingPage() {
             
             <textarea 
               placeholder="Tell us about your fitness goals"
-              rows="5"
+              rows={5}
               className="w-full bg-transparent border-2 border-gray-800 px-6 py-4 focus:border-red-500 outline-none transition-colors resize-none"
             ></textarea>
 

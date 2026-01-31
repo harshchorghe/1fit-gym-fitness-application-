@@ -12,7 +12,7 @@ export default function SignInPage() {
 
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -20,7 +20,7 @@ export default function SignInPage() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     console.log('Sign in:', formData);
     // Add your signin logic here
@@ -251,7 +251,7 @@ export default function SignInPage() {
           {/* Sign Up Link */}
           <div className="text-center mt-8 animate-slide-in-up stagger-3">
             <p className="text-gray-400">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Link href="/signup" className="text-red-500 hover:underline font-semibold">
                 Sign Up
               </Link>
