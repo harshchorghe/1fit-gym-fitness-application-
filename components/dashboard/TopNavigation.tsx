@@ -34,8 +34,8 @@ export default function TopNavigation({ onMenuClick }: TopNavigationProps) {
               style={{ fontFamily: 'Oswald, sans-serif' }}
               onClick={() => router.push('/home/overview')}
             >
-              <span className="text-white">IRON</span>
-              <span className="text-red-500">FORGE</span>
+              <span className="text-white">1</span>
+              <span className="text-red-500">FIT</span>
             </div>
           </div>
 

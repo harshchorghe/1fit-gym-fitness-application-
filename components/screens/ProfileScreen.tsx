@@ -6,15 +6,15 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState('overview');
 
   const userProfile = {
-    name: 'Alex Thompson',
-    email: 'alex.thompson@ironforge.com',
+    name: 'Harsh Chorghe',
+    email: 'harsh.chorghe@1fit.com',
     phone: '+1 (555) 123-4567',
     memberSince: 'January 2024',
     membershipType: 'Pro',
     avatar: '👤',
     bio: 'Fitness enthusiast focused on strength training and endurance. Love early morning workouts and helping others reach their goals!',
     location: 'San Francisco, CA',
-    age: 28,
+    age: 20,
     height: '6\'0"',
     currentWeight: '82 kg',
     targetWeight: '78 kg'

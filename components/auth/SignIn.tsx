@@ -111,8 +111,8 @@ export default function SignInPage() {
       <header className="relative z-10 p-6">
         <Link href="/" className="inline-block">
           <div className="text-3xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>
-            <span className="text-white">IRON</span>
-            <span className="text-red-500">FORGE</span>
+            <span className="text-white">1</span>
+            <span className="text-red-500">FIT</span>
           </div>
         </Link>
       </header>

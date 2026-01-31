@@ -122,7 +122,7 @@ export default function CommunityScreen() {
       {/* Header */}
       <div className="animate-slide-in">
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2" style={{ fontFamily: 'Oswald, sans-serif' }}>
-          IRONFORGE <span className="text-red-500">COMMUNITY</span>
+          1FIT <span className="text-red-500">COMMUNITY</span>
         </h1>
         <p className="text-gray-400">Connect, compete, and grow together</p>
       </div>
