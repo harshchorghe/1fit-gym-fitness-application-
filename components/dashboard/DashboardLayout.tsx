@@ -70,7 +70,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       <div className="grain"></div>
 
-      <TopNavigation onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
+      <TopNavigation 
+        onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
+      />
 
       <div className="flex pt-16">
         <Sidebar 

@@ -2,10 +2,46 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import SessionProgressReport from './SessionProgressReport';
+
+interface PreGymData {
+  weight: string;
+  heartRate: string;
+  energy: string;
+  mood: string;
+  notes: string;
+}
+
+interface PostGymData {
+  weight: string;
+  heartRate: string;
+  duration: string;
+  caloriesBurned: string;
+  exercises: string;
+  notes: string;
+}
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [completedSession, setCompletedSession] = useState<any>(null);
+  const [showPreWorkoutModal, setShowPreWorkoutModal] = useState(false);
+  const [showPostWorkoutModal, setShowPostWorkoutModal] = useState(false);
+  const [preGymData, setPreGymData] = useState<PreGymData>({
+    weight: '',
+    heartRate: '',
+    energy: '',
+    mood: '',
+    notes: ''
+  });
+  const [postGymData, setPostGymData] = useState<PostGymData>({
+    weight: '',
+    heartRate: '',
+    duration: '',
+    caloriesBurned: '',
+    exercises: '',
+    notes: ''
+  });
 
   // Dummy User Data
   const user = {
@@ -78,6 +114,20 @@ export default function Dashboard() {
     { name: 'Nutrition', icon: '🥗', key: 'nutrition' },
     { name: 'Community', icon: '👥', key: 'community' }
   ];
+
+  const handlePreGymSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log('Pre-Gym Data:', preGymData);
+    setShowPreWorkoutModal(false);
+    setPreGymData({ weight: '', heartRate: '', energy: '', mood: '', notes: '' });
+  };
+
+  const handlePostGymSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log('Post-Gym Data:', postGymData);
+    setShowPostWorkoutModal(false);
+    setPostGymData({ weight: '', heartRate: '', duration: '', caloriesBurned: '', exercises: '', notes: '' });
+  };
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -223,8 +273,221 @@ export default function Dashboard() {
 
         {/* Main Content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+          {/* Pre Workout Modal */}
+          {showPreWorkoutModal && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-40">
+              <div className="bg-black border border-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-6 sticky top-0 bg-black pb-4">
+                  <h2 className="text-2xl font-bold text-red-500">PRE WORKOUT ASSESSMENT</h2>
+                  <button
+                    onClick={() => setShowPreWorkoutModal(false)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <form onSubmit={handlePreGymSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Current Weight (kg)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={preGymData.weight}
+                        onChange={(e) => setPreGymData({ ...preGymData, weight: e.target.value })}
+                        placeholder="e.g., 75.5"
+                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-red-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Resting Heart Rate (BPM)</label>
+                      <input
+                        type="number"
+                        value={preGymData.heartRate}
+                        onChange={(e) => setPreGymData({ ...preGymData, heartRate: e.target.value })}
+                        placeholder="e.g., 72"
+                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-red-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Energy Level (1-10)</label>
+                      <select
+                        value={preGymData.energy}
+                        onChange={(e) => setPreGymData({ ...preGymData, energy: e.target.value })}
+                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-red-500"
+                        required
+                      >
+                        <option value="">Select energy level</option>
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                          <option key={num} value={num}>{num} - {num <= 3 ? 'Low' : num <= 6 ? 'Medium' : 'High'}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Mood</label>
+                      <select
+                        value={preGymData.mood}
+                        onChange={(e) => setPreGymData({ ...preGymData, mood: e.target.value })}
+                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-red-500"
+                        required
+                      >
+                        <option value="">Select mood</option>
+                        <option value="💪 Pumped">💪 Pumped</option>
+                        <option value="😌 Calm">😌 Calm</option>
+                        <option value="😴 Tired">😴 Tired</option>
+                        <option value="😤 Frustrated">😤 Frustrated</option>
+                        <option value="😊 Good">😊 Good</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Additional Notes</label>
+                    <textarea
+                      value={preGymData.notes}
+                      onChange={(e) => setPreGymData({ ...preGymData, notes: e.target.value })}
+                      placeholder="Any injuries, soreness, or notes..."
+                      className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-red-500 h-24"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="submit"
+                      className="flex-1 bg-red-500 hover:bg-red-600 px-4 py-2 font-bold rounded transition-colors"
+                    >
+                      SUBMIT
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPreWorkoutModal(false)}
+                      className="flex-1 bg-gray-800 hover:bg-gray-700 px-4 py-2 font-bold rounded transition-colors"
+                    >
+                      CANCEL
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Post Workout Modal */}
+          {showPostWorkoutModal && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-40">
+              <div className="bg-black border border-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-6 sticky top-0 bg-black pb-4">
+                  <h2 className="text-2xl font-bold text-green-500">POST WORKOUT ASSESSMENT</h2>
+                  <button
+                    onClick={() => setShowPostWorkoutModal(false)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <form onSubmit={handlePostGymSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Weight After Gym (kg)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={postGymData.weight}
+                        onChange={(e) => setPostGymData({ ...postGymData, weight: e.target.value })}
+                        placeholder="e.g., 74.8"
+                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-green-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Post-Workout Heart Rate (BPM)</label>
+                      <input
+                        type="number"
+                        value={postGymData.heartRate}
+                        onChange={(e) => setPostGymData({ ...postGymData, heartRate: e.target.value })}
+                        placeholder="e.g., 95"
+                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-green-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Workout Duration (minutes)</label>
+                      <input
+                        type="number"
+                        value={postGymData.duration}
+                        onChange={(e) => setPostGymData({ ...postGymData, duration: e.target.value })}
+                        placeholder="e.g., 60"
+                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-green-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Calories Burned</label>
+                      <input
+                        type="number"
+                        value={postGymData.caloriesBurned}
+                        onChange={(e) => setPostGymData({ ...postGymData, caloriesBurned: e.target.value })}
+                        placeholder="e.g., 450"
+                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-green-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Exercises Performed</label>
+                    <textarea
+                      value={postGymData.exercises}
+                      onChange={(e) => setPostGymData({ ...postGymData, exercises: e.target.value })}
+                      placeholder="List exercises and sets (e.g., Bench Press 4x10, Squats 4x8, ...)"
+                      className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-green-500 h-24"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Post-Workout Notes</label>
+                    <textarea
+                      value={postGymData.notes}
+                      onChange={(e) => setPostGymData({ ...postGymData, notes: e.target.value })}
+                      placeholder="How you felt, next steps, pain points..."
+                      className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-green-500 h-24"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="submit"
+                      className="flex-1 bg-green-500 hover:bg-green-600 px-4 py-2 font-bold rounded transition-colors"
+                    >
+                      SUBMIT
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPostWorkoutModal(false)}
+                      className="flex-1 bg-gray-800 hover:bg-gray-700 px-4 py-2 font-bold rounded transition-colors"
+                    >
+                      CANCEL
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'overview' && (
             <div className="max-w-7xl mx-auto space-y-6">
+              {/* Progress Report */}
+              {completedSession && (
+                <div className="animate-slide-in">
+                  <SessionProgressReport
+                    beforeGym={completedSession.beforeGym}
+                    afterGym={completedSession.afterGym}
+                    date={completedSession.date}
+                  />
+                </div>
+              )}
+
               {/* Welcome Header */}
               <div className="animate-slide-in">
                 <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2" style={{ fontFamily: 'Oswald, sans-serif' }}>
@@ -232,6 +495,17 @@ export default function Dashboard() {
                 </h1>
                 <p className="text-gray-400">Ready to crush today's goals?</p>
               </div>
+
+              {/* Progress Report */}
+              {completedSession && (
+                <div className="animate-slide-in">
+                  <SessionProgressReport
+                    beforeGym={completedSession.beforeGym}
+                    afterGym={completedSession.afterGym}
+                    date={completedSession.date}
+                  />
+                </div>
+              )}
 
               {/* This Week Stats */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-slide-in stagger-1">
@@ -312,21 +586,19 @@ export default function Dashboard() {
                     QUICK <span className="text-red-500">ACTIONS</span>
                   </h2>
                   <div className="space-y-3">
-                    <button className="w-full bg-red-500 hover:bg-red-600 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2">
-                      <span className="text-xl">💪</span>
-                      <span>START WORKOUT</span>
+                    <button 
+                      onClick={() => setShowPreWorkoutModal(true)}
+                      className="w-full bg-red-500 hover:bg-red-600 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2 rounded-lg"
+                    >
+                      <span className="text-xl">📝</span>
+                      <span>PRE WORKOUT TRACK</span>
                     </button>
-                    <button className="w-full border-2 border-gray-700 hover:border-red-500 p-4 font-bold transition-all flex items-center justify-center space-x-2">
-                      <span className="text-xl">📅</span>
-                      <span>BOOK CLASS</span>
-                    </button>
-                    <button className="w-full border-2 border-gray-700 hover:border-red-500 p-4 font-bold transition-all flex items-center justify-center space-x-2">
-                      <span className="text-xl">👤</span>
-                      <span>HIRE TRAINER</span>
-                    </button>
-                    <button className="w-full border-2 border-gray-700 hover:border-red-500 p-4 font-bold transition-all flex items-center justify-center space-x-2">
-                      <span className="text-xl">🥗</span>
-                      <span>MEAL PLAN</span>
+                    <button 
+                      onClick={() => setShowPostWorkoutModal(true)}
+                      className="w-full bg-green-600 hover:bg-green-700 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2 rounded-lg"
+                    >
+                      <span className="text-xl">✅</span>
+                      <span>POST WORKOUT TRACK</span>
                     </button>
                   </div>
                 </div>
