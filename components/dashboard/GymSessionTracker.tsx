@@ -82,7 +82,7 @@ export default function GymSessionTracker({ onSessionStart, onSessionComplete }:
         return {
           ...session,
           afterGym: postGymData,
-          sessionType: 'complete'
+          sessionType: 'complete' as const
         };
       }
       return session;
