@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import SessionProgressReport from './SessionProgressReport';
 
 interface PreGymData {
   weight: string;
@@ -21,27 +20,101 @@ interface PostGymData {
   notes: string;
 }
 
+interface ExerciseEntry {
+  name: string;
+  sets: string;
+  reps: string;
+  weight: string;
+}
+
+interface SessionReport {
+  preData: PreGymData;
+  postData: PostGymData;
+  exercises: ExerciseEntry[];
+  date: string;
+  totalVolume: number;
+  bodyWeightChange: number;
+  performanceScore: number;
+}
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [completedSession, setCompletedSession] = useState<any>(null);
+  const [workoutStep, setWorkoutStep] = useState(1);
   const [showPreWorkoutModal, setShowPreWorkoutModal] = useState(false);
   const [showPostWorkoutModal, setShowPostWorkoutModal] = useState(false);
+  const [showProgressReport, setShowProgressReport] = useState(false);
+  const [sessionReport, setSessionReport] = useState<SessionReport | null>(null);
+  const [exerciseLog, setExerciseLog] = useState<ExerciseEntry[]>([]);
+  const [currentExercise, setCurrentExercise] = useState<ExerciseEntry>({
+    name: '', sets: '', reps: '', weight: ''
+  });
   const [preGymData, setPreGymData] = useState<PreGymData>({
-    weight: '',
-    heartRate: '',
-    energy: '',
-    mood: '',
-    notes: ''
+    weight: '', heartRate: '', energy: '', mood: '', notes: ''
   });
   const [postGymData, setPostGymData] = useState<PostGymData>({
-    weight: '',
-    heartRate: '',
-    duration: '',
-    caloriesBurned: '',
-    exercises: '',
-    notes: ''
+    weight: '', heartRate: '', duration: '', caloriesBurned: '', exercises: '', notes: ''
   });
+
+  // ── Exercise helpers ──
+  const EXERCISE_SUGGESTIONS = [
+    'Bench Press', 'Squat', 'Deadlift', 'Overhead Press', 'Pull-Ups',
+    'Barbell Row', 'Leg Press', 'Incline Bench Press', 'Lat Pulldown', 'Cable Row',
+    'Bicep Curl', 'Tricep Dip', 'Leg Extension', 'Leg Curl', 'Calf Raise',
+    'Lunges', 'Romanian Deadlift', 'Face Pull', 'Lateral Raise', 'Hip Thrust',
+    'Chest Fly', 'Hammer Curl', 'Skull Crusher', 'Bulgarian Split Squat', 'Plank'
+  ];
+
+  const addExercise = () => {
+    if (!currentExercise.name || !currentExercise.sets || !currentExercise.reps) return;
+    setExerciseLog(prev => [...prev, { ...currentExercise }]);
+    setCurrentExercise({ name: '', sets: '', reps: '', weight: '' });
+  };
+
+  const removeExercise = (index: number) => {
+    setExerciseLog(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const calculateReport = (): SessionReport => {
+    const totalVolume = exerciseLog.reduce((sum, ex) => {
+      return sum + (parseInt(ex.sets) || 0) * (parseInt(ex.reps) || 0) * (parseFloat(ex.weight) || 1);
+    }, 0);
+    const bodyWeightChange = parseFloat(postGymData.weight) - parseFloat(preGymData.weight);
+    const energyScore = parseInt(preGymData.energy) * 10;
+    const volumeScore = Math.min(100, (exerciseLog.length / 6) * 100);
+    const durationScore = Math.min(100, (parseInt(postGymData.duration) / 60) * 100);
+    const performanceScore = Math.round(energyScore * 0.3 + volumeScore * 0.4 + durationScore * 0.3);
+    return {
+      preData: preGymData,
+      postData: postGymData,
+      exercises: exerciseLog,
+      date: new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+      totalVolume: Math.round(totalVolume),
+      bodyWeightChange: Math.round(bodyWeightChange * 10) / 10,
+      performanceScore
+    };
+  };
+
+  const handlePreGymSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setShowPreWorkoutModal(false);
+    setWorkoutStep(1);
+  };
+
+  const handlePostGymSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSessionReport(calculateReport());
+    setShowPostWorkoutModal(false);
+    setShowProgressReport(true);
+  };
+
+  const resetSession = () => {
+    setShowProgressReport(false);
+    setExerciseLog([]);
+    setPreGymData({ weight: '', heartRate: '', energy: '', mood: '', notes: '' });
+    setPostGymData({ weight: '', heartRate: '', duration: '', caloriesBurned: '', exercises: '', notes: '' });
+    setSessionReport(null);
+  };
 
   // Dummy User Data
   const user = {
@@ -115,20 +188,6 @@ export default function Dashboard() {
     { name: 'Community', icon: '👥', key: 'community' }
   ];
 
-  const handlePreGymSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Pre-Gym Data:', preGymData);
-    setShowPreWorkoutModal(false);
-    setPreGymData({ weight: '', heartRate: '', energy: '', mood: '', notes: '' });
-  };
-
-  const handlePostGymSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Post-Gym Data:', postGymData);
-    setShowPostWorkoutModal(false);
-    setPostGymData({ weight: '', heartRate: '', duration: '', caloriesBurned: '', exercises: '', notes: '' });
-  };
-
   return (
     <div className="min-h-screen bg-black text-white">
       <style jsx global>{`
@@ -168,8 +227,17 @@ export default function Dashboard() {
           50% { opacity: 1; }
         }
 
+        @keyframes fadeScaleIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+
         .animate-slide-in {
           animation: slideIn 0.5s ease-out forwards;
+        }
+
+        .animate-fade-scale {
+          animation: fadeScaleIn 0.3s ease-out forwards;
         }
 
         .stagger-1 { animation-delay: 0.1s; }
@@ -188,13 +256,12 @@ export default function Dashboard() {
 
       <div className="grain"></div>
 
-      {/* Top Navigation */}
+      {/* ── Top Navigation ── */}
       <nav className="fixed top-0 w-full bg-black/90 backdrop-blur-lg border-b border-gray-900 z-50">
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo & Mobile Menu */}
             <div className="flex items-center space-x-4">
-              <button 
+              <button
                 className="lg:hidden text-white"
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               >
@@ -208,17 +275,13 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Right Side */}
             <div className="flex items-center space-x-4">
-              {/* Notifications */}
               <button className="relative p-2 hover:bg-gray-900 rounded-lg transition-colors">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
-
-              {/* User Profile */}
               <div className="flex items-center space-x-3 p-2 hover:bg-gray-900 rounded-lg transition-colors cursor-pointer">
                 <div className="text-3xl">{user.image}</div>
                 <div className="hidden sm:block text-left">
@@ -232,7 +295,7 @@ export default function Dashboard() {
       </nav>
 
       <div className="flex pt-16">
-        {/* Sidebar */}
+        {/* ── Sidebar ── */}
         <aside className={`fixed lg:static inset-y-0 left-0 w-64 bg-gray-900/50 backdrop-blur-lg border-r border-gray-800 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 z-40 mt-16 lg:mt-0`}>
           <nav className="p-4 space-y-2">
             {navigationItems.map((item) => (
@@ -243,8 +306,8 @@ export default function Dashboard() {
                   setIsSidebarOpen(false);
                 }}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-                  activeTab === item.key 
-                    ? 'bg-red-500 text-white' 
+                  activeTab === item.key
+                    ? 'bg-red-500 text-white'
                     : 'text-gray-400 hover:bg-gray-800 hover:text-white'
                 }`}
               >
@@ -254,7 +317,6 @@ export default function Dashboard() {
             ))}
           </nav>
 
-          {/* Quick Stats in Sidebar */}
           <div className="p-4 mt-4 border-t border-gray-800">
             <div className="bg-gradient-to-br from-red-500/20 to-black border border-red-500/30 p-4 rounded-lg">
               <div className="flex items-center space-x-2 mb-2">
@@ -271,241 +333,659 @@ export default function Dashboard() {
           </div>
         </aside>
 
-        {/* Main Content */}
+        {/* ── Main Content ── */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          {/* Pre Workout Modal */}
+
+          {/* ════════════════════════════════════════════════
+              PRE-WORKOUT MODAL
+          ════════════════════════════════════════════════ */}
           {showPreWorkoutModal && (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-40">
-              <div className="bg-black border border-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="flex justify-between items-center mb-6 sticky top-0 bg-black pb-4">
-                  <h2 className="text-2xl font-bold text-red-500">PRE WORKOUT ASSESSMENT</h2>
-                  <button
-                    onClick={() => setShowPreWorkoutModal(false)}
-                    className="text-gray-400 hover:text-white transition-colors"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <form onSubmit={handlePreGymSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold mb-2">Current Weight (kg)</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={preGymData.weight}
-                        onChange={(e) => setPreGymData({ ...preGymData, weight: e.target.value })}
-                        placeholder="e.g., 75.5"
-                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-red-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold mb-2">Resting Heart Rate (BPM)</label>
-                      <input
-                        type="number"
-                        value={preGymData.heartRate}
-                        onChange={(e) => setPreGymData({ ...preGymData, heartRate: e.target.value })}
-                        placeholder="e.g., 72"
-                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-red-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold mb-2">Energy Level (1-10)</label>
-                      <select
-                        value={preGymData.energy}
-                        onChange={(e) => setPreGymData({ ...preGymData, energy: e.target.value })}
-                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-red-500"
-                        required
-                      >
-                        <option value="">Select energy level</option>
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
-                          <option key={num} value={num}>{num} - {num <= 3 ? 'Low' : num <= 6 ? 'Medium' : 'High'}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold mb-2">Mood</label>
-                      <select
-                        value={preGymData.mood}
-                        onChange={(e) => setPreGymData({ ...preGymData, mood: e.target.value })}
-                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-red-500"
-                        required
-                      >
-                        <option value="">Select mood</option>
-                        <option value="💪 Pumped">💪 Pumped</option>
-                        <option value="😌 Calm">😌 Calm</option>
-                        <option value="😴 Tired">😴 Tired</option>
-                        <option value="😤 Frustrated">😤 Frustrated</option>
-                        <option value="😊 Good">😊 Good</option>
-                      </select>
-                    </div>
-                  </div>
+            <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
+              <div className="animate-fade-scale bg-[#0a0a0a] border border-gray-800 rounded-xl w-full max-w-2xl max-h-[95vh] overflow-y-auto shadow-2xl shadow-red-500/10">
+
+                {/* Header */}
+                <div className="sticky top-0 bg-[#0a0a0a] border-b border-gray-800 px-6 py-4 flex justify-between items-center z-10">
                   <div>
-                    <label className="block text-sm font-semibold mb-2">Additional Notes</label>
-                    <textarea
-                      value={preGymData.notes}
-                      onChange={(e) => setPreGymData({ ...preGymData, notes: e.target.value })}
-                      placeholder="Any injuries, soreness, or notes..."
-                      className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-red-500 h-24"
-                    />
+                    <div className="text-xs text-red-500 tracking-[0.3em] uppercase font-semibold mb-1">Session Begins</div>
+                    <h2 className="text-2xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>
+                      PRE-WORKOUT <span className="text-red-500">ASSESSMENT</span>
+                    </h2>
                   </div>
-                  <div className="flex gap-3">
-                    <button
-                      type="submit"
-                      className="flex-1 bg-red-500 hover:bg-red-600 px-4 py-2 font-bold rounded transition-colors"
-                    >
-                      SUBMIT
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowPreWorkoutModal(false)}
-                      className="flex-1 bg-gray-800 hover:bg-gray-700 px-4 py-2 font-bold rounded transition-colors"
-                    >
-                      CANCEL
+                  <div className="flex items-center gap-4">
+                    {/* Step dots */}
+                    <div className="flex gap-1.5">
+                      {[1, 2].map(step => (
+                        <div key={step} className={`w-8 h-1 rounded-full transition-all duration-300 ${workoutStep >= step ? 'bg-red-500' : 'bg-gray-700'}`} />
+                      ))}
+                    </div>
+                    <button onClick={() => { setShowPreWorkoutModal(false); setWorkoutStep(1); }}
+                      className="text-gray-500 hover:text-white transition-colors p-1">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
                     </button>
                   </div>
-                </form>
+                </div>
+
+                <div className="p-6">
+                  {/* ── STEP 1: Body Metrics & Readiness ── */}
+                  {workoutStep === 1 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-5">
+                        <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-xs font-bold">1</div>
+                        <span className="text-sm text-gray-400 uppercase tracking-wider">Body Metrics & Readiness</span>
+                      </div>
+
+                      {/* Weight + Heart Rate */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                        <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 focus-within:border-red-500 transition-colors">
+                          <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Body Weight</label>
+                          <div className="flex items-end gap-2">
+                            <input
+                              type="number" step="0.1"
+                              value={preGymData.weight}
+                              onChange={(e) => setPreGymData({ ...preGymData, weight: e.target.value })}
+                              placeholder="75.0"
+                              className="flex-1 bg-transparent text-3xl font-bold text-white placeholder-gray-700 focus:outline-none w-full"
+                              style={{ fontFamily: 'Oswald, sans-serif' }}
+                            />
+                            <span className="text-gray-500 text-sm mb-1">KG</span>
+                          </div>
+                        </div>
+                        <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 focus-within:border-red-500 transition-colors">
+                          <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Resting Heart Rate</label>
+                          <div className="flex items-end gap-2">
+                            <input
+                              type="number"
+                              value={preGymData.heartRate}
+                              onChange={(e) => setPreGymData({ ...preGymData, heartRate: e.target.value })}
+                              placeholder="72"
+                              className="flex-1 bg-transparent text-3xl font-bold text-white placeholder-gray-700 focus:outline-none w-full"
+                              style={{ fontFamily: 'Oswald, sans-serif' }}
+                            />
+                            <span className="text-gray-500 text-sm mb-1">BPM</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Energy Level */}
+                      <div className="mb-5">
+                        <label className="text-xs text-gray-400 uppercase tracking-wider mb-3 block">Energy Level</label>
+                        <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                          {[1,2,3,4,5,6,7,8,9,10].map(num => (
+                            <button key={num} type="button"
+                              onClick={() => setPreGymData({ ...preGymData, energy: String(num) })}
+                              className={`h-10 rounded font-bold text-sm transition-all ${
+                                preGymData.energy === String(num)
+                                  ? 'bg-red-500 text-white scale-110 shadow-lg shadow-red-500/40'
+                                  : 'bg-gray-900 text-gray-500 hover:bg-gray-800 hover:text-white border border-gray-800'
+                              }`}
+                              style={{ fontFamily: 'Oswald, sans-serif' }}>
+                              {num}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex justify-between mt-2 text-xs text-gray-600">
+                          <span>💀 Dying</span>
+                          <span>😐 Okay</span>
+                          <span>⚡ Beast Mode</span>
+                        </div>
+                      </div>
+
+                      {/* Mood Selector */}
+                      <div className="mb-5">
+                        <label className="text-xs text-gray-400 uppercase tracking-wider mb-3 block">Current Mood</label>
+                        <div className="grid grid-cols-5 gap-2">
+                          {[
+                            { emoji: '💪', label: 'Pumped', value: 'Pumped' },
+                            { emoji: '😌', label: 'Calm', value: 'Calm' },
+                            { emoji: '😴', label: 'Tired', value: 'Tired' },
+                            { emoji: '😤', label: 'Angry', value: 'Angry' },
+                            { emoji: '😊', label: 'Good', value: 'Good' },
+                          ].map(m => (
+                            <button key={m.value} type="button"
+                              onClick={() => setPreGymData({ ...preGymData, mood: m.value })}
+                              className={`flex flex-col items-center py-3 rounded-lg border transition-all ${
+                                preGymData.mood === m.value
+                                  ? 'border-red-500 bg-red-500/15 scale-105 shadow-lg shadow-red-500/20'
+                                  : 'border-gray-800 bg-gray-900/50 hover:border-gray-600'
+                              }`}>
+                              <span className="text-2xl mb-1">{m.emoji}</span>
+                              <span className="text-xs text-gray-400">{m.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Notes */}
+                      <div className="mb-6">
+                        <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Notes / Injuries</label>
+                        <textarea
+                          value={preGymData.notes}
+                          onChange={(e) => setPreGymData({ ...preGymData, notes: e.target.value })}
+                          placeholder="Any soreness, injuries, or things to keep in mind today..."
+                          className="w-full bg-gray-900/50 border border-gray-800 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-red-500 transition-colors resize-none h-20"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!preGymData.weight || !preGymData.heartRate || !preGymData.energy || !preGymData.mood) return;
+                          setWorkoutStep(2);
+                        }}
+                        disabled={!preGymData.weight || !preGymData.heartRate || !preGymData.energy || !preGymData.mood}
+                        className="w-full py-3.5 bg-red-500 hover:bg-red-600 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed font-bold rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+                        style={{ fontFamily: 'Oswald, sans-serif', letterSpacing: '0.1em' }}>
+                        NEXT: LOG YOUR EXERCISES →
+                      </button>
+                    </div>
+                  )}
+
+                  {/* ── STEP 2: Exercise Logger ── */}
+                  {workoutStep === 2 && (
+                    <form onSubmit={handlePreGymSubmit}>
+                      <div className="flex items-center gap-2 mb-5">
+                        <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-xs font-bold">2</div>
+                        <span className="text-sm text-gray-400 uppercase tracking-wider">Plan Your Exercises</span>
+                        <span className="ml-auto text-xs text-gray-600 italic">You can also add more post-workout</span>
+                      </div>
+
+                      {/* Exercise Input */}
+                      <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 mb-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                          <div className="sm:col-span-2">
+                            <input
+                              list="exercise-suggestions"
+                              value={currentExercise.name}
+                              onChange={(e) => setCurrentExercise({ ...currentExercise, name: e.target.value })}
+                              placeholder="Exercise name..."
+                              className="w-full bg-black border border-gray-700 rounded px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-500 transition-colors"
+                            />
+                            <datalist id="exercise-suggestions">
+                              {EXERCISE_SUGGESTIONS.map(ex => <option key={ex} value={ex} />)}
+                            </datalist>
+                          </div>
+                          <input
+                            type="number" min="1"
+                            value={currentExercise.sets}
+                            onChange={(e) => setCurrentExercise({ ...currentExercise, sets: e.target.value })}
+                            placeholder="Sets"
+                            className="bg-black border border-gray-700 rounded px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-500 transition-colors"
+                          />
+                          <input
+                            type="number" min="1"
+                            value={currentExercise.reps}
+                            onChange={(e) => setCurrentExercise({ ...currentExercise, reps: e.target.value })}
+                            placeholder="Reps"
+                            className="bg-black border border-gray-700 rounded px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-500 transition-colors"
+                          />
+                        </div>
+                        <div className="flex gap-3">
+                          <input
+                            type="number" step="0.5"
+                            value={currentExercise.weight}
+                            onChange={(e) => setCurrentExercise({ ...currentExercise, weight: e.target.value })}
+                            placeholder="Weight in kg — leave blank for bodyweight"
+                            className="flex-1 bg-black border border-gray-700 rounded px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-500 transition-colors"
+                          />
+                          <button
+                            type="button" onClick={addExercise}
+                            disabled={!currentExercise.name || !currentExercise.sets || !currentExercise.reps}
+                            className="px-5 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed font-bold text-sm rounded transition-all"
+                            style={{ fontFamily: 'Oswald, sans-serif' }}>
+                            + ADD
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Exercise List */}
+                      {exerciseLog.length === 0 ? (
+                        <div className="text-center py-8 border border-dashed border-gray-800 rounded-lg mb-4">
+                          <div className="text-4xl mb-2">📋</div>
+                          <div className="text-sm text-gray-600">No exercises added yet</div>
+                          <div className="text-xs text-gray-700 mt-1">Add your plan above — or skip and start</div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 mb-4">
+                          {exerciseLog.map((ex, i) => (
+                            <div key={i} className="flex items-center justify-between bg-black border border-gray-800 hover:border-red-500/40 rounded-lg px-4 py-3 transition-all group">
+                              <div>
+                                <div className="font-bold text-sm" style={{ fontFamily: 'Oswald, sans-serif' }}>{ex.name}</div>
+                                <div className="text-xs text-gray-500 mt-0.5">
+                                  {ex.sets} sets × {ex.reps} reps {ex.weight ? `@ ${ex.weight} kg` : '(bodyweight)'}
+                                </div>
+                              </div>
+                              <button type="button" onClick={() => removeExercise(i)}
+                                className="text-gray-700 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 ml-3">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          ))}
+                          <div className="flex items-center gap-2 pt-1 px-1">
+                            <div className="text-xs text-gray-600">{exerciseLog.length} exercises planned</div>
+                            <div className="h-px flex-1 bg-gray-800" />
+                            <div className="text-xs text-red-500 font-semibold">
+                              {exerciseLog.reduce((s, e) => s + (parseInt(e.sets) || 0), 0)} total sets
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex gap-3 mt-6">
+                        <button type="button" onClick={() => setWorkoutStep(1)}
+                          className="px-6 py-3 bg-gray-900 hover:bg-gray-800 text-sm font-bold rounded-lg transition-all border border-gray-800"
+                          style={{ fontFamily: 'Oswald, sans-serif' }}>
+                          ← BACK
+                        </button>
+                        <button type="submit"
+                          className="flex-1 py-3 bg-red-500 hover:bg-red-600 font-bold rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+                          style={{ fontFamily: 'Oswald, sans-serif', letterSpacing: '0.1em' }}>
+                          LET&apos;S GO — START WORKOUT 🔥
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
-          {/* Post Workout Modal */}
+          {/* ════════════════════════════════════════════════
+              POST-WORKOUT MODAL
+          ════════════════════════════════════════════════ */}
           {showPostWorkoutModal && (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-40">
-              <div className="bg-black border border-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="flex justify-between items-center mb-6 sticky top-0 bg-black pb-4">
-                  <h2 className="text-2xl font-bold text-green-500">POST WORKOUT ASSESSMENT</h2>
-                  <button
-                    onClick={() => setShowPostWorkoutModal(false)}
-                    className="text-gray-400 hover:text-white transition-colors"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
+              <div className="animate-fade-scale bg-[#0a0a0a] border border-gray-800 rounded-xl w-full max-w-2xl max-h-[95vh] overflow-y-auto shadow-2xl shadow-green-500/5">
+
+                {/* Header */}
+                <div className="sticky top-0 bg-[#0a0a0a] border-b border-gray-800 px-6 py-4 flex justify-between items-center z-10">
+                  <div>
+                    <div className="text-xs text-green-500 tracking-[0.3em] uppercase font-semibold mb-1">Session Complete</div>
+                    <h2 className="text-2xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>
+                      POST-WORKOUT <span className="text-green-400">LOG</span>
+                    </h2>
+                  </div>
+                  <button onClick={() => setShowPostWorkoutModal(false)}
+                    className="text-gray-500 hover:text-white transition-colors p-1">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
-                <form onSubmit={handlePostGymSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold mb-2">Weight After Gym (kg)</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={postGymData.weight}
-                        onChange={(e) => setPostGymData({ ...postGymData, weight: e.target.value })}
-                        placeholder="e.g., 74.8"
-                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-green-500"
-                        required
-                      />
+
+                <form onSubmit={handlePostGymSubmit} className="p-6">
+
+                  {/* Pre-session reminder strip */}
+                  {preGymData.weight && (
+                    <div className="bg-gray-900/60 border border-gray-800 rounded-lg p-3 mb-5 flex items-center gap-3 flex-wrap">
+                      <span className="text-xs text-gray-500 uppercase tracking-wider">Pre-session:</span>
+                      <span className="text-xs text-white">{preGymData.weight} kg</span>
+                      <span className="text-gray-700 text-xs">|</span>
+                      <span className="text-xs text-white">{preGymData.heartRate} BPM</span>
+                      <span className="text-gray-700 text-xs">|</span>
+                      <span className="text-xs text-white">Energy {preGymData.energy}/10</span>
+                      <span className="text-gray-700 text-xs">|</span>
+                      <span className="text-xs">
+                        {preGymData.mood === 'Pumped' ? '💪' : preGymData.mood === 'Calm' ? '😌' : preGymData.mood === 'Tired' ? '😴' : preGymData.mood === 'Angry' ? '😤' : '😊'} {preGymData.mood}
+                      </span>
                     </div>
-                    <div>
-                      <label className="block text-sm font-semibold mb-2">Post-Workout Heart Rate (BPM)</label>
-                      <input
-                        type="number"
-                        value={postGymData.heartRate}
-                        onChange={(e) => setPostGymData({ ...postGymData, heartRate: e.target.value })}
-                        placeholder="e.g., 95"
-                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-green-500"
-                        required
-                      />
+                  )}
+
+                  {/* Metrics Grid */}
+                  <div className="grid grid-cols-2 gap-4 mb-5">
+
+                    {/* Post Weight */}
+                    <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 focus-within:border-green-500/50 transition-colors">
+                      <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Post Weight</label>
+                      <div className="flex items-end gap-2">
+                        <input
+                          type="number" step="0.1"
+                          value={postGymData.weight}
+                          onChange={(e) => setPostGymData({ ...postGymData, weight: e.target.value })}
+                          placeholder="74.5"
+                          className="flex-1 bg-transparent text-3xl font-bold text-white placeholder-gray-700 focus:outline-none w-full"
+                          style={{ fontFamily: 'Oswald, sans-serif' }}
+                          required
+                        />
+                        <span className="text-gray-500 text-sm mb-1">KG</span>
+                      </div>
+                      {preGymData.weight && postGymData.weight && (
+                        <div className={`text-xs mt-2 font-semibold ${parseFloat(postGymData.weight) < parseFloat(preGymData.weight) ? 'text-green-400' : 'text-yellow-500'}`}>
+                          {parseFloat(postGymData.weight) < parseFloat(preGymData.weight)
+                            ? `▼ ${(parseFloat(preGymData.weight) - parseFloat(postGymData.weight)).toFixed(1)} kg water loss`
+                            : `▲ ${(parseFloat(postGymData.weight) - parseFloat(preGymData.weight)).toFixed(1)} kg`}
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-sm font-semibold mb-2">Workout Duration (minutes)</label>
-                      <input
-                        type="number"
-                        value={postGymData.duration}
-                        onChange={(e) => setPostGymData({ ...postGymData, duration: e.target.value })}
-                        placeholder="e.g., 60"
-                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-green-500"
-                        required
-                      />
+
+                    {/* Post Heart Rate */}
+                    <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 focus-within:border-green-500/50 transition-colors">
+                      <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Post Heart Rate</label>
+                      <div className="flex items-end gap-2">
+                        <input
+                          type="number"
+                          value={postGymData.heartRate}
+                          onChange={(e) => setPostGymData({ ...postGymData, heartRate: e.target.value })}
+                          placeholder="90"
+                          className="flex-1 bg-transparent text-3xl font-bold text-white placeholder-gray-700 focus:outline-none w-full"
+                          style={{ fontFamily: 'Oswald, sans-serif' }}
+                          required
+                        />
+                        <span className="text-gray-500 text-sm mb-1">BPM</span>
+                      </div>
+                      {preGymData.heartRate && postGymData.heartRate && (
+                        <div className="text-xs mt-2 text-gray-500">
+                          ↑ {Math.abs(parseInt(postGymData.heartRate) - parseInt(preGymData.heartRate))} BPM above resting
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-sm font-semibold mb-2">Calories Burned</label>
-                      <input
-                        type="number"
-                        value={postGymData.caloriesBurned}
-                        onChange={(e) => setPostGymData({ ...postGymData, caloriesBurned: e.target.value })}
-                        placeholder="e.g., 450"
-                        className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-green-500"
-                        required
-                      />
+
+                    {/* Duration */}
+                    <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 focus-within:border-green-500/50 transition-colors">
+                      <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Duration</label>
+                      <div className="flex items-end gap-2">
+                        <input
+                          type="number"
+                          value={postGymData.duration}
+                          onChange={(e) => setPostGymData({ ...postGymData, duration: e.target.value })}
+                          placeholder="60"
+                          className="flex-1 bg-transparent text-3xl font-bold text-white placeholder-gray-700 focus:outline-none w-full"
+                          style={{ fontFamily: 'Oswald, sans-serif' }}
+                          required
+                        />
+                        <span className="text-gray-500 text-sm mb-1">MIN</span>
+                      </div>
+                    </div>
+
+                    {/* Calories */}
+                    <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 focus-within:border-green-500/50 transition-colors">
+                      <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Calories Burned</label>
+                      <div className="flex items-end gap-2">
+                        <input
+                          type="number"
+                          value={postGymData.caloriesBurned}
+                          onChange={(e) => setPostGymData({ ...postGymData, caloriesBurned: e.target.value })}
+                          placeholder="450"
+                          className="flex-1 bg-transparent text-3xl font-bold text-white placeholder-gray-700 focus:outline-none w-full"
+                          style={{ fontFamily: 'Oswald, sans-serif' }}
+                          required
+                        />
+                        <span className="text-gray-500 text-sm mb-1">KCAL</span>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">Exercises Performed</label>
-                    <textarea
-                      value={postGymData.exercises}
-                      onChange={(e) => setPostGymData({ ...postGymData, exercises: e.target.value })}
-                      placeholder="List exercises and sets (e.g., Bench Press 4x10, Squats 4x8, ...)"
-                      className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-green-500 h-24"
-                      required
-                    />
+
+                  {/* Exercise Review + Add More */}
+                  <div className="mb-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-xs text-gray-400 uppercase tracking-wider">Exercises Done</label>
+                      {exerciseLog.length > 0 && (
+                        <span className="text-xs text-green-400">{exerciseLog.length} carried from pre-workout</span>
+                      )}
+                    </div>
+
+                    {exerciseLog.length > 0 && (
+                      <div className="space-y-1.5 mb-3">
+                        {exerciseLog.map((ex, i) => (
+                          <div key={i} className="flex items-center justify-between bg-black border border-gray-800 rounded-lg px-4 py-2.5 group">
+                            <div>
+                              <div className="font-bold text-sm text-green-400" style={{ fontFamily: 'Oswald, sans-serif' }}>✓ {ex.name}</div>
+                              <div className="text-xs text-gray-600">{ex.sets} × {ex.reps} reps {ex.weight ? `@ ${ex.weight} kg` : ''}</div>
+                            </div>
+                            <button type="button" onClick={() => removeExercise(i)}
+                              className="text-gray-700 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 ml-3">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Quick-add extra exercises */}
+                    <div className="bg-gray-900/30 border border-dashed border-gray-800 rounded-lg p-3">
+                      <div className="text-xs text-gray-600 mb-2">+ Add any extra exercises you did that weren&apos;t in your plan:</div>
+                      <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+                        <input
+                          list="exercise-suggestions-post"
+                          value={currentExercise.name}
+                          onChange={(e) => setCurrentExercise({ ...currentExercise, name: e.target.value })}
+                          placeholder="Exercise name"
+                          className="flex-1 min-w-0 bg-black border border-gray-700 rounded px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-green-500"
+                        />
+                        <input type="number" value={currentExercise.sets}
+                          onChange={(e) => setCurrentExercise({ ...currentExercise, sets: e.target.value })}
+                          placeholder="Sets" className="w-16 bg-black border border-gray-700 rounded px-2 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-green-500"
+                        />
+                        <input type="number" value={currentExercise.reps}
+                          onChange={(e) => setCurrentExercise({ ...currentExercise, reps: e.target.value })}
+                          placeholder="Reps" className="w-16 bg-black border border-gray-700 rounded px-2 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-green-500"
+                        />
+                        <button type="button" onClick={addExercise}
+                          disabled={!currentExercise.name || !currentExercise.sets || !currentExercise.reps}
+                          className="px-4 py-1.5 bg-green-600 hover:bg-green-500 disabled:bg-gray-800 disabled:text-gray-600 font-bold text-xs rounded transition-all">
+                          +
+                        </button>
+                      </div>
+                      <datalist id="exercise-suggestions-post">
+                        {EXERCISE_SUGGESTIONS.map(ex => <option key={ex} value={ex} />)}
+                      </datalist>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">Post-Workout Notes</label>
+
+                  {/* Post notes */}
+                  <div className="mb-6">
+                    <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 block">How Did It Go?</label>
                     <textarea
                       value={postGymData.notes}
                       onChange={(e) => setPostGymData({ ...postGymData, notes: e.target.value })}
-                      placeholder="How you felt, next steps, pain points..."
-                      className="w-full bg-gray-800 border border-gray-700 px-4 py-2 rounded text-white focus:outline-none focus:border-green-500 h-24"
+                      placeholder="PRs hit, pain points, what to improve next time..."
+                      className="w-full bg-gray-900/50 border border-gray-800 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-green-500 transition-colors resize-none h-20"
                     />
                   </div>
-                  <div className="flex gap-3">
-                    <button
-                      type="submit"
-                      className="flex-1 bg-green-500 hover:bg-green-600 px-4 py-2 font-bold rounded transition-colors"
-                    >
-                      SUBMIT
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowPostWorkoutModal(false)}
-                      className="flex-1 bg-gray-800 hover:bg-gray-700 px-4 py-2 font-bold rounded transition-colors"
-                    >
-                      CANCEL
-                    </button>
-                  </div>
+
+                  <button type="submit"
+                    className="w-full py-3.5 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 font-bold rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-green-500/20"
+                    style={{ fontFamily: 'Oswald, sans-serif', letterSpacing: '0.15em', fontSize: '1rem' }}>
+                    FINISH SESSION & VIEW REPORT 📊
+                  </button>
                 </form>
               </div>
             </div>
           )}
 
+          {/* ════════════════════════════════════════════════
+              SESSION PROGRESS REPORT MODAL
+          ════════════════════════════════════════════════ */}
+          {showProgressReport && sessionReport && (
+            <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
+              <div className="animate-fade-scale bg-[#0a0a0a] border border-gray-800 rounded-xl w-full max-w-2xl max-h-[95vh] overflow-y-auto shadow-2xl">
+
+                {/* Gradient top bar */}
+                <div className="h-1 w-full bg-gradient-to-r from-red-600 via-yellow-500 to-green-500 rounded-t-xl" />
+
+                <div className="px-6 py-5">
+                  {/* Title */}
+                  <div className="text-center mb-5">
+                    <div className="text-5xl mb-3">
+                      {sessionReport.performanceScore >= 80 ? '🔥' :
+                       sessionReport.performanceScore >= 60 ? '💪' :
+                       sessionReport.performanceScore >= 40 ? '👍' : '💡'}
+                    </div>
+                    <h2 className="text-3xl font-bold mb-1" style={{ fontFamily: 'Oswald, sans-serif' }}>
+                      SESSION <span className="text-red-500">REPORT</span>
+                    </h2>
+                    <div className="text-gray-500 text-sm">{sessionReport.date}</div>
+                  </div>
+
+                  {/* Performance Score Ring */}
+                  <div className="flex justify-center mb-6">
+                    <div className="relative w-32 h-32">
+                      <svg className="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#1a1a1a" strokeWidth="10" />
+                        <circle cx="60" cy="60" r="50" fill="none"
+                          stroke={sessionReport.performanceScore >= 80 ? '#22c55e' : sessionReport.performanceScore >= 60 ? '#eab308' : '#ef4444'}
+                          strokeWidth="10"
+                          strokeDasharray={`${(sessionReport.performanceScore / 100) * 314} 314`}
+                          strokeLinecap="round"
+                          style={{ transition: 'stroke-dasharray 1s ease' }}
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <div className="text-4xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>
+                          {sessionReport.performanceScore}
+                        </div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wider">score</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Key Stats */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                    {[
+                      { label: 'Duration', value: sessionReport.postData.duration, unit: 'min', icon: '⏱️' },
+                      { label: 'Calories', value: sessionReport.postData.caloriesBurned, unit: 'kcal', icon: '🔥' },
+                      { label: 'Exercises', value: sessionReport.exercises.length, unit: 'done', icon: '💪' },
+                      {
+                        label: 'Total Sets',
+                        value: sessionReport.exercises.reduce((s, e) => s + (parseInt(e.sets) || 0), 0),
+                        unit: 'sets',
+                        icon: '📊'
+                      },
+                    ].map(stat => (
+                      <div key={stat.label} className="bg-gray-900/60 border border-gray-800 rounded-lg p-3 text-center hover:border-red-500/30 transition-colors">
+                        <div className="text-2xl mb-1">{stat.icon}</div>
+                        <div className="text-2xl font-bold text-white" style={{ fontFamily: 'Oswald, sans-serif' }}>{stat.value}</div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wider">{stat.unit}</div>
+                        <div className="text-xs text-gray-700 mt-0.5">{stat.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Before vs After */}
+                  <div className="bg-gray-900/40 border border-gray-800 rounded-lg p-4 mb-4">
+                    <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Before vs After</div>
+                    <div className="grid grid-cols-3 text-center">
+                      <div className="text-xs text-gray-600 font-semibold uppercase pb-2 border-b border-gray-800">Metric</div>
+                      <div className="text-xs text-red-400 font-semibold uppercase pb-2 border-b border-gray-800">Before</div>
+                      <div className="text-xs text-green-400 font-semibold uppercase pb-2 border-b border-gray-800">After</div>
+
+                      <div className="text-xs text-gray-500 py-2 border-b border-gray-900">Weight</div>
+                      <div className="text-xs text-white py-2 border-b border-gray-900">{sessionReport.preData.weight} kg</div>
+                      <div className="text-xs py-2 border-b border-gray-900">
+                        <span className="text-white">{sessionReport.postData.weight} kg </span>
+                        <span className={sessionReport.bodyWeightChange < 0 ? 'text-green-400' : 'text-yellow-400'}>
+                          ({sessionReport.bodyWeightChange > 0 ? '+' : ''}{sessionReport.bodyWeightChange})
+                        </span>
+                      </div>
+
+                      <div className="text-xs text-gray-500 py-2 border-b border-gray-900">Heart Rate</div>
+                      <div className="text-xs text-white py-2 border-b border-gray-900">{sessionReport.preData.heartRate} BPM</div>
+                      <div className="text-xs text-white py-2 border-b border-gray-900">
+                        {sessionReport.postData.heartRate} BPM
+                        <span className="text-yellow-400 ml-1">(+{Math.abs(parseInt(sessionReport.postData.heartRate) - parseInt(sessionReport.preData.heartRate))})</span>
+                      </div>
+
+                      <div className="text-xs text-gray-500 py-2">Energy</div>
+                      <div className="text-xs text-white py-2">{sessionReport.preData.energy}/10</div>
+                      <div className="text-xs text-green-400 py-2">Crushed it ✓</div>
+                    </div>
+                  </div>
+
+                  {/* Exercise Breakdown */}
+                  {sessionReport.exercises.length > 0 && (
+                    <div className="mb-4">
+                      <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Exercises Performed</div>
+                      <div className="space-y-1.5">
+                        {sessionReport.exercises.map((ex, i) => {
+                          const volume = (parseInt(ex.sets) || 0) * (parseInt(ex.reps) || 0) * (parseFloat(ex.weight) || 1);
+                          return (
+                            <div key={i} className="flex items-center justify-between bg-black border border-gray-900 rounded-lg px-3 py-2.5">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-700 w-5">{i + 1}.</span>
+                                <div>
+                                  <div className="text-sm font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>{ex.name}</div>
+                                  <div className="text-xs text-gray-600">{ex.sets} × {ex.reps} reps{ex.weight ? ` @ ${ex.weight} kg` : ''}</div>
+                                </div>
+                              </div>
+                              {ex.weight && (
+                                <div className="text-xs text-red-400 font-semibold">{Math.round(volume).toLocaleString()} kg vol</div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {sessionReport.totalVolume > 0 && (
+                        <div className="mt-2 bg-gray-900/50 border border-gray-800 rounded-lg p-3 flex justify-between items-center">
+                          <span className="text-xs text-gray-500">Total Volume Lifted</span>
+                          <span className="text-sm font-bold text-red-400" style={{ fontFamily: 'Oswald, sans-serif' }}>
+                            {sessionReport.totalVolume.toLocaleString()} kg
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Session Insight */}
+                  <div className={`border rounded-lg p-4 mb-5 ${
+                    sessionReport.performanceScore >= 80 ? 'border-green-500/30 bg-green-500/5' :
+                    sessionReport.performanceScore >= 60 ? 'border-yellow-500/30 bg-yellow-500/5' :
+                    'border-red-500/30 bg-red-500/5'
+                  }`}>
+                    <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">💡 Session Insight</div>
+                    <p className="text-sm text-gray-300 leading-relaxed">
+                      {sessionReport.performanceScore >= 80
+                        ? `Outstanding session. ${sessionReport.postData.duration} minutes, ${sessionReport.postData.caloriesBurned} kcal torched, and ${sessionReport.exercises.length} exercises completed. You walked in at energy ${sessionReport.preData.energy}/10 and delivered. Rest hard and come back even stronger.`
+                        : sessionReport.performanceScore >= 60
+                        ? `Solid work. You showed up and put in ${sessionReport.exercises.length} exercises over ${sessionReport.postData.duration} minutes. Consistency like this compounds over time. Focus on progressive overload in your next session.`
+                        : parseInt(sessionReport.preData.energy) <= 4
+                        ? `You came in at energy ${sessionReport.preData.energy}/10 and still got it done — that's pure discipline. Prioritize sleep and nutrition tonight. Your next session will reflect it.`
+                        : `Every session counts. ${sessionReport.exercises.length} exercises completed. Keep showing up and the results will follow.`
+                      }
+                    </p>
+                    {sessionReport.postData.notes && (
+                      <div className="mt-3 pt-3 border-t border-gray-800">
+                        <div className="text-xs text-gray-600 mb-1">Your notes:</div>
+                        <div className="text-xs text-gray-400 italic">&quot;{sessionReport.postData.notes}&quot;</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-3">
+                    <button onClick={() => setShowProgressReport(false)}
+                      className="flex-1 py-3 bg-gray-900 hover:bg-gray-800 font-bold rounded-lg transition-all border border-gray-800 text-sm"
+                      style={{ fontFamily: 'Oswald, sans-serif' }}>
+                      CLOSE
+                    </button>
+                    <button onClick={resetSession}
+                      className="flex-1 py-3 bg-red-500 hover:bg-red-600 font-bold rounded-lg transition-all text-sm"
+                      style={{ fontFamily: 'Oswald, sans-serif' }}>
+                      NEW SESSION 🔥
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ════════════════════════════════════════════════
+              OVERVIEW TAB
+          ════════════════════════════════════════════════ */}
           {activeTab === 'overview' && (
             <div className="max-w-7xl mx-auto space-y-6">
-              {/* Progress Report */}
-              {completedSession && (
-                <div className="animate-slide-in">
-                  <SessionProgressReport
-                    beforeGym={completedSession.beforeGym}
-                    afterGym={completedSession.afterGym}
-                    date={completedSession.date}
-                  />
-                </div>
-              )}
 
               {/* Welcome Header */}
               <div className="animate-slide-in">
                 <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2" style={{ fontFamily: 'Oswald, sans-serif' }}>
                   WELCOME BACK, <span className="text-red-500">{user.name.split(' ')[0].toUpperCase()}</span>
                 </h1>
-                <p className="text-gray-400">Ready to crush today's goals?</p>
+                <p className="text-gray-400">Ready to crush today&apos;s goals?</p>
               </div>
-
-              {/* Progress Report */}
-              {completedSession && (
-                <div className="animate-slide-in">
-                  <SessionProgressReport
-                    beforeGym={completedSession.beforeGym}
-                    afterGym={completedSession.afterGym}
-                    date={completedSession.date}
-                  />
-                </div>
-              )}
 
               {/* This Week Stats */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-slide-in stagger-1">
@@ -543,12 +1023,12 @@ export default function Dashboard() {
                 {/* Today's Schedule */}
                 <div className="lg:col-span-2 bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6 animate-slide-in stagger-2">
                   <h2 className="text-2xl font-bold mb-4" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                    TODAY'S <span className="text-red-500">SCHEDULE</span>
+                    TODAY&apos;S <span className="text-red-500">SCHEDULE</span>
                   </h2>
                   <div className="space-y-3">
                     {todayClasses.map((classItem) => (
-                      <div 
-                        key={classItem.id} 
+                      <div
+                        key={classItem.id}
                         className={`flex items-center justify-between p-4 border-l-4 ${
                           classItem.status === 'completed' ? 'border-green-500 bg-green-500/10' :
                           classItem.status === 'upcoming' ? 'border-yellow-500 bg-yellow-500/10' :
@@ -586,21 +1066,38 @@ export default function Dashboard() {
                     QUICK <span className="text-red-500">ACTIONS</span>
                   </h2>
                   <div className="space-y-3">
-                    <button 
+                    <button
                       onClick={() => setShowPreWorkoutModal(true)}
                       className="w-full bg-red-500 hover:bg-red-600 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2 rounded-lg"
                     >
                       <span className="text-xl">📝</span>
-                      <span>PRE WORKOUT TRACK</span>
+                      <span style={{ fontFamily: 'Oswald, sans-serif', letterSpacing: '0.05em' }}>PRE WORKOUT TRACK</span>
                     </button>
-                    <button 
+                    <button
                       onClick={() => setShowPostWorkoutModal(true)}
                       className="w-full bg-green-600 hover:bg-green-700 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2 rounded-lg"
                     >
                       <span className="text-xl">✅</span>
-                      <span>POST WORKOUT TRACK</span>
+                      <span style={{ fontFamily: 'Oswald, sans-serif', letterSpacing: '0.05em' }}>POST WORKOUT TRACK</span>
                     </button>
+                    {sessionReport && (
+                      <button
+                        onClick={() => setShowProgressReport(true)}
+                        className="w-full bg-gray-800 hover:bg-gray-700 border border-gray-700 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2 rounded-lg"
+                      >
+                        <span className="text-xl">📊</span>
+                        <span style={{ fontFamily: 'Oswald, sans-serif', letterSpacing: '0.05em' }}>VIEW LAST REPORT</span>
+                      </button>
+                    )}
                   </div>
+
+                  {/* Session status indicator */}
+                  {preGymData.weight && !sessionReport && (
+                    <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                      <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-1">Session Active 🟢</div>
+                      <div className="text-xs text-gray-400">Pre-workout logged. Complete your post-workout when done.</div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -642,7 +1139,7 @@ export default function Dashboard() {
                             <span className="text-sm text-gray-400">{goal.current}/{goal.target} {goal.unit}</span>
                           </div>
                           <div className="w-full bg-gray-800 h-3 rounded-full overflow-hidden">
-                            <div 
+                            <div
                               className="h-full bg-gradient-to-r from-red-600 to-red-500 transition-all duration-500"
                               style={{ width: `${progress}%` }}
                             ></div>
@@ -681,11 +1178,11 @@ export default function Dashboard() {
                   </h2>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {achievements.map((achievement) => (
-                      <div 
-                        key={achievement.id} 
+                      <div
+                        key={achievement.id}
                         className={`text-center p-4 border ${
-                          achievement.unlocked 
-                            ? 'border-red-500 bg-red-500/10' 
+                          achievement.unlocked
+                            ? 'border-red-500 bg-red-500/10'
                             : 'border-gray-800 bg-gray-900/50 opacity-50'
                         }`}
                       >
@@ -729,7 +1226,7 @@ export default function Dashboard() {
                   {navigationItems.find(item => item.key === activeTab)?.name.toUpperCase()}
                 </h2>
                 <p className="text-gray-400 mb-8">This section is under development</p>
-                <button 
+                <button
                   onClick={() => setActiveTab('overview')}
                   className="bg-red-500 hover:bg-red-600 px-8 py-3 font-bold transition-all"
                 >
