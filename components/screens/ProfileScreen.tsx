@@ -1,461 +1,374 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { onAuthStateChanged, updateProfile } from 'firebase/auth';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage } from '@/lib/firebase';  // ← make sure storage is exported
 
 export default function ProfileScreen() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const router = useRouter();
 
-  const userProfile = {
+  const [userData, setUserData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [editForm, setEditForm] = useState<any>({});
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  const fallbackProfile = {
     name: 'Harsh Chorghe',
     email: 'harsh.chorghe@1fit.com',
-    phone: '+1 (555) 123-4567',
-    memberSince: 'January 2024',
+    phone: '+91 98765 43210',
+    memberSince: 'January 2025',
     membershipType: 'Pro',
     avatar: '👤',
-    bio: 'Fitness enthusiast focused on strength training and endurance. Love early morning workouts and helping others reach their goals!',
-    location: 'San Francisco, CA',
+    bio: 'Fitness enthusiast focused on strength training and endurance.',
+    location: 'Maharashtra, IN',
     age: 20,
-    height: '6\'0"',
-    currentWeight: '82 kg',
-    targetWeight: '78 kg'
+    height: "5'10\"",
+    currentWeight: '75 kg',
+    targetWeight: '72 kg'
   };
 
-  const stats = {
-    totalWorkouts: 124,
-    totalHours: 98,
-    caloriesBurned: 52400,
-    currentStreak: 12,
-    longestStreak: 42,
-    averagePerWeek: 5.2
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        router.push('/signin');
+        return;
+      }
+
+      try {
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userSnap = await getDoc(userDocRef);
+
+        let profileData;
+
+        if (userSnap.exists()) {
+          const data = userSnap.data();
+          profileData = {
+            ...data,
+            name: firebaseUser.displayName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'User',
+            email: firebaseUser.email || data.email,
+            avatar: firebaseUser.photoURL || data.photoURL || '👤',
+            memberSince: new Date(data.createdAt || Date.now()).toLocaleDateString('default', { month: 'long', year: 'numeric' }),
+            membershipType: data.membershipType || 'Starter',
+            phone: data.phone || '',
+            location: data.location || '',
+            age: data.age || '',
+            height: data.height || '',
+            currentWeight: data.currentWeight || '',
+            targetWeight: data.targetWeight || '',
+            bio: data.bio || ''
+          };
+        } else {
+          profileData = fallbackProfile;
+        }
+
+        setUserData(profileData);
+        setEditForm(profileData);
+        setPreviewImage(profileData.avatar); // initial preview
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+        setUserData(fallbackProfile);
+        setEditForm(fallbackProfile);
+        setPreviewImage(fallbackProfile.avatar);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setEditForm((prev: any) => ({ ...prev, [name]: value }));
   };
 
-  const personalRecords = [
-    { exercise: 'Bench Press', weight: '120 kg', date: 'Jan 20, 2026', icon: '💪' },
-    { exercise: 'Deadlift', weight: '180 kg', date: 'Jan 15, 2026', icon: '🏋️' },
-    { exercise: 'Squat', weight: '150 kg', date: 'Jan 18, 2026', icon: '🦵' },
-    { exercise: '5K Run', time: '22:15', date: 'Jan 10, 2026', icon: '🏃' }
-  ];
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const badges = [
-    { id: 1, name: 'Early Bird', icon: '🌅', description: '50 workouts before 7 AM', unlocked: true },
-    { id: 2, name: '30 Day Streak', icon: '🔥', description: '30 consecutive days', unlocked: true },
-    { id: 3, name: 'Iron Warrior', icon: '⚔️', description: '100 strength sessions', unlocked: true },
-    { id: 4, name: 'Cardio King', icon: '👑', description: '50 cardio sessions', unlocked: false },
-    { id: 5, name: 'Perfect Week', icon: '⭐', description: '7 workouts in 7 days', unlocked: true },
-    { id: 6, name: 'Marathon Ready', icon: '🏅', description: 'Run 100 km total', unlocked: false },
-    { id: 7, name: 'Strength Master', icon: '💯', description: '500 kg total lifts', unlocked: true },
-    { id: 8, name: 'Consistency', icon: '📅', description: '365 workouts in a year', unlocked: false }
-  ];
+    // Show preview immediately
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
 
-  const preferences = {
-    notifications: {
-      email: true,
-      push: true,
-      sms: false,
-      workoutReminders: true,
-      classReminders: true,
-      achievements: true
-    },
-    privacy: {
-      profileVisible: true,
-      showStats: true,
-      showActivity: false
-    },
-    goals: {
-      weeklyWorkouts: 6,
-      monthlyCalories: 10000,
-      targetWeight: 78
+    // Store file for upload on save
+    setEditForm((prev: any) => ({ ...prev, photoFile: file }));
+  };
+
+  const handleSave = async () => {
+    if (!auth.currentUser) return;
+    setSaving(true);
+
+    try {
+      let photoURL = userData.avatar;
+
+      // 1. Upload new photo if selected
+      if (editForm.photoFile) {
+        setUploadingPhoto(true);
+        const file = editForm.photoFile;
+        const storageRef = ref(storage, `profile-pictures/${auth.currentUser.uid}/${Date.now()}_${file.name}`);
+
+        await uploadBytes(storageRef, file);
+        photoURL = await getDownloadURL(storageRef);
+        setUploadingPhoto(false);
+      }
+
+      // 2. Update Firebase Auth (name + photoURL)
+      if (editForm.name !== userData.name || photoURL !== userData.avatar) {
+        await updateProfile(auth.currentUser, {
+          displayName: editForm.name.trim(),
+          photoURL: photoURL.startsWith('http') ? photoURL : null
+        });
+      }
+
+      // 3. Update Firestore
+      const userDocRef = doc(db, 'users', auth.currentUser.uid);
+      await updateDoc(userDocRef, {
+        firstName: editForm.name.split(' ')[0] || '',
+        lastName: editForm.name.split(' ').slice(1).join(' ') || '',
+        name: editForm.name.trim(),
+        bio: editForm.bio.trim(),
+        phone: editForm.phone.trim(),
+        location: editForm.location.trim(),
+        age: editForm.age ? Number(editForm.age) : null,
+        height: editForm.height.trim(),
+        currentWeight: editForm.currentWeight.trim(),
+        targetWeight: editForm.targetWeight.trim(),
+        photoURL: photoURL.startsWith('http') ? photoURL : null,
+        updatedAt: new Date().toISOString()
+      });
+
+      // 4. Refresh local state
+      setUserData({
+        ...editForm,
+        avatar: photoURL,
+        memberSince: userData.memberSince,
+        membershipType: userData.membershipType
+      });
+      setEditForm({
+        ...editForm,
+        avatar: photoURL,
+        photoFile: null
+      });
+      setPreviewImage(photoURL);
+      setIsEditing(false);
+
+      alert('Profile updated successfully!');
+    } catch (err: any) {
+      console.error('Save error:', err);
+      alert('Failed to update profile: ' + (err.message || 'Unknown error'));
+    } finally {
+      setSaving(false);
+      setUploadingPhoto(false);
     }
   };
 
-  const workoutHistory = [
-    { date: 'Jan 30', type: 'Strength', duration: '58 min', calories: 420 },
-    { date: 'Jan 29', type: 'HIIT', duration: '35 min', calories: 380 },
-    { date: 'Jan 28', type: 'Strength', duration: '62 min', calories: 510 },
-    { date: 'Jan 27', type: 'Cardio', duration: '45 min', calories: 340 },
-    { date: 'Jan 26', type: 'Yoga', duration: '50 min', calories: 220 }
-  ];
+  const handleCancel = () => {
+    setEditForm(userData);
+    setPreviewImage(userData.avatar);
+    setIsEditing(false);
+  };
 
-  const favoriteWorkouts = [
-    { name: 'Morning Power', type: 'Strength', times: 24 },
-    { name: 'Cardio Blast', type: 'Cardio', times: 18 },
-    { name: 'HIIT Circuit', type: 'HIIT', times: 15 },
-    { name: 'Recovery Flow', type: 'Yoga', times: 12 }
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+        <div className="text-2xl animate-pulse">Loading your profile...</div>
+      </div>
+    );
+  }
+
+  const profile = userData || fallbackProfile;
+
+  const editableFields = [
+    { label: 'Phone', key: 'phone', type: 'tel' },
+    { label: 'Location', key: 'location', type: 'text' },
+    { label: 'Age', key: 'age', type: 'number' },
+    { label: 'Height', key: 'height', type: 'text' },
+    { label: 'Current Weight', key: 'currentWeight', type: 'text' },
+    { label: 'Target Weight', key: 'targetWeight', type: 'text' },
   ];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="animate-slide-in">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2" style={{ fontFamily: 'Oswald, sans-serif' }}>
+    <div className="max-w-5xl mx-auto space-y-8 p-4 md:p-8">
+
+      {/* Page Header */}
+      <div>
+        <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-1" style={{ fontFamily: 'Oswald, sans-serif' }}>
           YOUR <span className="text-red-500">PROFILE</span>
         </h1>
-        <p className="text-gray-400">Manage your account and track your journey</p>
+        <p className="text-gray-500 text-sm">Manage your personal information</p>
       </div>
 
       {/* Profile Card */}
-      <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6 animate-slide-in stagger-1">
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Avatar Section */}
-          <div className="flex flex-col items-center space-y-4">
-            <div className="w-32 h-32 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-6xl border-4 border-red-500">
-              {userProfile.avatar}
-            </div>
-            <button className="bg-gray-800 hover:bg-red-500 px-4 py-2 text-sm font-bold transition-colors">
-              CHANGE PHOTO
-            </button>
-            <div className="text-center">
-              <div className="text-sm text-gray-500">Member Since</div>
-              <div className="font-bold text-red-500">{userProfile.memberSince}</div>
-            </div>
-          </div>
+      <div className="bg-[#111] border border-[#222] rounded-2xl overflow-hidden shadow-2xl">
 
-          {/* Profile Info */}
-          <div className="flex-1 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-3xl font-bold mb-1" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                  {userProfile.name}
-                </h2>
-                <div className="flex items-center space-x-2">
-                  <span className="bg-red-500 px-3 py-1 text-xs font-bold rounded">
-                    {userProfile.membershipType.toUpperCase()} MEMBER
-                  </span>
-                  <span className="text-sm text-gray-500">Level: Advanced</span>
-                </div>
-              </div>
-              <button className="bg-gray-800 hover:bg-red-500 px-6 py-2 font-bold transition-colors">
-                EDIT PROFILE
-              </button>
-            </div>
+        {/* Top accent bar */}
+        <div className="h-1 w-full bg-gradient-to-r from-red-600 via-red-500 to-orange-500" />
 
-            <p className="text-gray-400">{userProfile.bio}</p>
+        <div className="p-6 md:p-10">
+          <div className="flex flex-col lg:flex-row gap-10">
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Email</div>
-                <div className="text-sm font-semibold">{userProfile.email}</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Phone</div>
-                <div className="text-sm font-semibold">{userProfile.phone}</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Location</div>
-                <div className="text-sm font-semibold">{userProfile.location}</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Age</div>
-                <div className="text-sm font-semibold">{userProfile.age} years</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Height</div>
-                <div className="text-sm font-semibold">{userProfile.height}</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Weight</div>
-                <div className="text-sm font-semibold">{userProfile.currentWeight} → {userProfile.targetWeight}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-gray-800 pb-4">
-        {[
-          { id: 'overview', name: 'Overview', icon: '📊' },
-          { id: 'stats', name: 'Statistics', icon: '📈' },
-          { id: 'badges', name: 'Badges', icon: '🏆' },
-          { id: 'settings', name: 'Settings', icon: '⚙️' }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center space-x-2 px-4 py-2 font-semibold transition-all ${
-              activeTab === tab.id
-                ? 'bg-red-500 text-white'
-                : 'bg-gray-900 border border-gray-800 text-gray-400 hover:border-red-500 hover:text-white'
-            }`}
-          >
-            <span>{tab.icon}</span>
-            <span>{tab.name}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Overview Tab */}
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-4 hover:border-red-500 transition-all">
-              <div className="text-xs text-gray-500 mb-1">Total Workouts</div>
-              <div className="text-2xl font-bold text-red-500" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                {stats.totalWorkouts}
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-4 hover:border-red-500 transition-all">
-              <div className="text-xs text-gray-500 mb-1">Total Hours</div>
-              <div className="text-2xl font-bold text-red-500" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                {stats.totalHours}
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-4 hover:border-red-500 transition-all">
-              <div className="text-xs text-gray-500 mb-1">Calories</div>
-              <div className="text-2xl font-bold text-red-500" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                {(stats.caloriesBurned / 1000).toFixed(1)}k
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-4 hover:border-red-500 transition-all">
-              <div className="text-xs text-gray-500 mb-1">Current Streak</div>
-              <div className="text-2xl font-bold text-red-500" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                {stats.currentStreak}
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-4 hover:border-red-500 transition-all">
-              <div className="text-xs text-gray-500 mb-1">Best Streak</div>
-              <div className="text-2xl font-bold text-red-500" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                {stats.longestStreak}
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-4 hover:border-red-500 transition-all">
-              <div className="text-xs text-gray-500 mb-1">Avg/Week</div>
-              <div className="text-2xl font-bold text-red-500" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                {stats.averagePerWeek}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Personal Records */}
-            <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6">
-              <h2 className="text-2xl font-bold mb-4" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                PERSONAL <span className="text-red-500">RECORDS</span>
-              </h2>
-              <div className="space-y-3">
-                {personalRecords.map((record, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 bg-black/50 border border-gray-800 hover:border-red-500 transition-all">
-                    <div className="flex items-center space-x-3">
-                      <div className="text-3xl">{record.icon}</div>
-                      <div>
-                        <div className="font-bold">{record.exercise}</div>
-                        <div className="text-xs text-gray-500">{record.date}</div>
-                      </div>
-                    </div>
-                    <div className="text-xl font-bold text-red-500" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                      {record.weight || record.time}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recent Activity */}
-            <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6">
-              <h2 className="text-2xl font-bold mb-4" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                RECENT <span className="text-red-500">ACTIVITY</span>
-              </h2>
-              <div className="space-y-2">
-                {workoutHistory.map((workout, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-black/50 border border-gray-800">
-                    <div>
-                      <div className="font-bold text-sm">{workout.type}</div>
-                      <div className="text-xs text-gray-500">{workout.date}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-red-500">{workout.duration}</div>
-                      <div className="text-xs text-gray-500">{workout.calories} cal</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Favorite Workouts */}
-          <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6">
-            <h2 className="text-2xl font-bold mb-4" style={{ fontFamily: 'Oswald, sans-serif' }}>
-              FAVORITE <span className="text-red-500">WORKOUTS</span>
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {favoriteWorkouts.map((workout, idx) => (
-                <div key={idx} className="bg-black/50 border border-gray-800 p-4 text-center hover:border-red-500 transition-all">
-                  <div className="text-3xl mb-2">⭐</div>
-                  <div className="font-bold mb-1">{workout.name}</div>
-                  <div className="text-xs text-gray-500 mb-2">{workout.type}</div>
-                  <div className="text-sm text-red-500">Completed {workout.times}x</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Statistics Tab */}
-      {activeTab === 'stats' && (
-        <div className="space-y-6">
-          <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-12 text-center">
-            <h2 className="text-3xl font-bold mb-4" style={{ fontFamily: 'Oswald, sans-serif' }}>
-              DETAILED <span className="text-red-500">STATISTICS</span>
-            </h2>
-            <p className="text-gray-400 mb-8">Advanced analytics and charts coming soon</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div>
-                <div className="text-4xl font-bold text-red-500 mb-2" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                  {stats.totalWorkouts}
-                </div>
-                <div className="text-sm text-gray-500">Total Workouts</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold text-red-500 mb-2" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                  {stats.totalHours}h
-                </div>
-                <div className="text-sm text-gray-500">Training Time</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold text-red-500 mb-2" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                  {(stats.caloriesBurned / 1000).toFixed(1)}k
-                </div>
-                <div className="text-sm text-gray-500">Calories Burned</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold text-red-500 mb-2" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                  {stats.longestStreak}
-                </div>
-                <div className="text-sm text-gray-500">Best Streak</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Badges Tab */}
-      {activeTab === 'badges' && (
-        <div className="space-y-6">
-          <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6">
-            <h2 className="text-2xl font-bold mb-4" style={{ fontFamily: 'Oswald, sans-serif' }}>
-              YOUR <span className="text-red-500">ACHIEVEMENTS</span>
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {badges.map((badge) => (
-                <div
-                  key={badge.id}
-                  className={`text-center p-6 border ${
-                    badge.unlocked
-                      ? 'border-yellow-500 bg-yellow-500/10'
-                      : 'border-gray-800 bg-gray-900/50 opacity-50'
-                  } hover:scale-105 transition-transform`}
-                >
-                  <div className="text-5xl mb-3">{badge.icon}</div>
-                  <div className="font-bold mb-1">{badge.name}</div>
-                  <div className="text-xs text-gray-500 mb-2">{badge.description}</div>
-                  {badge.unlocked ? (
-                    <div className="text-xs text-green-500 font-bold">✓ UNLOCKED</div>
+            {/* ── LEFT COLUMN ── Avatar + Upload */}
+            <div className="flex flex-col items-center gap-5 lg:w-52 shrink-0">
+              <div className="relative group">
+                <div className="w-36 h-36 rounded-full bg-gradient-to-br from-red-500 to-red-800 flex items-center justify-center text-6xl border-4 border-[#1a1a1a] ring-2 ring-red-500 shadow-xl shadow-red-900/30 overflow-hidden">
+                  {previewImage && previewImage.startsWith('http') || previewImage?.startsWith('data:') ? (
+                    <img
+                      src={previewImage}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
-                    <div className="text-xs text-gray-600">🔒 Locked</div>
+                    previewImage || profile.avatar
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Settings Tab */}
-      {activeTab === 'settings' && (
-        <div className="space-y-6">
-          {/* Account Settings */}
-          <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6">
-            <h2 className="text-2xl font-bold mb-4" style={{ fontFamily: 'Oswald, sans-serif' }}>
-              ACCOUNT <span className="text-red-500">SETTINGS</span>
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Display Name</label>
-                <input
-                  type="text"
-                  defaultValue={userProfile.name}
-                  className="w-full bg-gray-800 border border-gray-700 px-4 py-2 focus:border-red-500 outline-none"
-                />
+                {/* Upload button - only visible in edit mode */}
+                {isEditing && (
+                  <label className="absolute bottom-1 right-1 bg-red-600 hover:bg-red-700 text-white p-2.5 rounded-full cursor-pointer shadow-lg transition-transform transform hover:scale-110">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoChange}
+                      className="hidden"
+                      disabled={uploadingPhoto || saving}
+                    />
+                  </label>
+                )}
+
+                {uploadingPhoto && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full">
+                    <div className="text-white text-sm animate-pulse">Uploading...</div>
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Email</label>
-                <input
-                  type="email"
-                  defaultValue={userProfile.email}
-                  className="w-full bg-gray-800 border border-gray-700 px-4 py-2 focus:border-red-500 outline-none"
-                />
+
+              {/* Member Since */}
+              <div className="text-center">
+                <p className="text-xs text-gray-600 uppercase tracking-widest mb-0.5">Member Since</p>
+                <p className="text-red-500 font-bold text-base">{profile.memberSince}</p>
               </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Bio</label>
+
+              {/* Badge */}
+              <span className="bg-red-600/20 border border-red-600/40 text-red-400 text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full">
+                {profile.membershipType} Member
+              </span>
+            </div>
+
+            {/* ── RIGHT COLUMN ── */}
+            <div className="flex-1 min-w-0 space-y-6">
+              {/* Name row */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                {isEditing ? (
+                  <input
+                    type="text"
+                    name="name"
+                    value={editForm.name}
+                    onChange={handleEditChange}
+                    className="flex-1 text-2xl font-bold bg-[#1a1a1a] border border-[#333] focus:border-red-500 outline-none px-4 py-2.5 rounded-lg text-white placeholder-gray-600 transition-colors"
+                    placeholder="Your Name"
+                  />
+                ) : (
+                  <h2 className="text-3xl md:text-4xl font-black tracking-tight flex-1" style={{ fontFamily: 'Oswald, sans-serif' }}>
+                    {profile.name}
+                  </h2>
+                )}
+
+                {!isEditing ? (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="shrink-0 bg-[#1e1e1e] hover:bg-red-600 border border-[#333] hover:border-red-600 text-white text-sm font-bold px-5 py-2.5 rounded-lg transition-all duration-200"
+                  >
+                    EDIT PROFILE
+                  </button>
+                ) : (
+                  <div className="flex gap-3 shrink-0">
+                    <button
+                      onClick={handleSave}
+                      disabled={saving || uploadingPhoto}
+                      className="bg-green-600 hover:bg-green-500 text-white text-sm font-bold px-6 py-2.5 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {saving ? 'SAVING...' : 'SAVE'}
+                    </button>
+                    <button
+                      onClick={handleCancel}
+                      className="bg-[#1e1e1e] hover:bg-[#2a2a2a] border border-[#333] text-white text-sm font-bold px-5 py-2.5 rounded-lg transition-colors"
+                    >
+                      CANCEL
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Bio */}
+              {isEditing ? (
                 <textarea
-                  defaultValue={userProfile.bio}
+                  name="bio"
+                  value={editForm.bio}
+                  onChange={handleEditChange}
                   rows={3}
-                  className="w-full bg-gray-800 border border-gray-700 px-4 py-2 focus:border-red-500 outline-none"
+                  className="w-full bg-[#1a1a1a] border border-[#333] focus:border-red-500 outline-none px-4 py-3 rounded-lg text-gray-200 placeholder-gray-600 resize-none transition-colors"
+                  placeholder="Write something about yourself..."
                 />
+              ) : (
+                <p className="text-gray-400 leading-relaxed text-sm border-l-2 border-red-600/40 pl-4">
+                  {profile.bio || "No bio yet. Click 'Edit Profile' to add one!"}
+                </p>
+              )}
+
+              {/* Divider */}
+              <div className="border-t border-[#1e1e1e]" />
+
+              {/* Fields Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5">
+                {/* Email */}
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600">Email</p>
+                  <p className="text-sm font-semibold text-gray-200 truncate">{profile.email}</p>
+                </div>
+
+                {/* Editable fields */}
+                {editableFields.map((field) => (
+                  <div key={field.key} className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600">{field.label}</p>
+                    {isEditing ? (
+                      <input
+                        type={field.type}
+                        name={field.key}
+                        value={editForm[field.key] || ''}
+                        onChange={handleEditChange}
+                        className="w-full bg-[#1a1a1a] border border-[#333] focus:border-red-500 outline-none px-3 py-2 rounded-lg text-white text-sm placeholder-gray-600 transition-colors"
+                        placeholder={`Enter ${field.label.toLowerCase()}`}
+                      />
+                    ) : (
+                      <p className={`text-sm font-semibold ${profile[field.key] ? 'text-gray-200' : 'text-gray-600'}`}>
+                        {profile[field.key] || 'Not set'}
+                      </p>
+                    )}
+                  </div>
+                ))}
               </div>
-              <button className="bg-red-500 hover:bg-red-600 px-6 py-2 font-bold transition-colors">
-                SAVE CHANGES
-              </button>
-            </div>
-          </div>
-
-          {/* Notification Settings */}
-          <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6">
-            <h2 className="text-2xl font-bold mb-4" style={{ fontFamily: 'Oswald, sans-serif' }}>
-              NOTIFICATION <span className="text-red-500">PREFERENCES</span>
-            </h2>
-            <div className="space-y-3">
-              {Object.entries(preferences.notifications).map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between p-3 bg-black/50 border border-gray-800">
-                  <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" defaultChecked={value} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Privacy Settings */}
-          <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6">
-            <h2 className="text-2xl font-bold mb-4" style={{ fontFamily: 'Oswald, sans-serif' }}>
-              PRIVACY <span className="text-red-500">SETTINGS</span>
-            </h2>
-            <div className="space-y-3">
-              {Object.entries(preferences.privacy).map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between p-3 bg-black/50 border border-gray-800">
-                  <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" defaultChecked={value} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Danger Zone */}
-          <div className="bg-gradient-to-br from-red-900/20 to-black border border-red-900 p-6">
-            <h2 className="text-2xl font-bold mb-4 text-red-500" style={{ fontFamily: 'Oswald, sans-serif' }}>
-              DANGER ZONE
-            </h2>
-            <div className="space-y-3">
-              <button className="w-full bg-gray-800 hover:bg-gray-700 border border-gray-700 py-3 font-bold transition-colors text-left px-4">
-                CHANGE PASSWORD
-              </button>
-              <button className="w-full bg-gray-800 hover:bg-gray-700 border border-gray-700 py-3 font-bold transition-colors text-left px-4">
-                CANCEL MEMBERSHIP
-              </button>
-              <button className="w-full bg-red-900/50 hover:bg-red-900 border border-red-800 py-3 font-bold transition-colors text-left px-4">
-                DELETE ACCOUNT
-              </button>
             </div>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Footer note */}
+      <p className="text-center text-gray-600 text-sm pb-4">
+        More features (workout stats, badges, history) coming soon...
+      </p>
     </div>
   );
 }

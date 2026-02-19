@@ -1,6 +1,10 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';  // Adjust path if needed (e.g. '@/lib/firebase')
 
 interface TopNavigationProps {
   onMenuClick: () => void;
@@ -8,12 +12,68 @@ interface TopNavigationProps {
 
 export default function TopNavigation({ onMenuClick }: TopNavigationProps) {
   const router = useRouter();
-  
-  const user = {
-    name: 'Alex Thompson',
-    membershipType: 'Pro',
+
+  const [userInfo, setUserInfo] = useState<{
+    name: string;
+    membershipType: string;
+    image: string;
+  }>({
+    name: 'Guest',
+    membershipType: '',
     image: '👤',
-  };
+  });
+
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        // Not logged in → show guest or redirect
+        setUserInfo({
+          name: 'Guest',
+          membershipType: '',
+          image: '👤',
+        });
+        // Optional: router.push('/signin');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch from Firestore
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userSnap = await getDoc(userDocRef);
+
+        let name = firebaseUser.displayName || 'User';
+        let membership = 'Starter';
+
+        if (userSnap.exists()) {
+          const data = userSnap.data();
+          name = firebaseUser.displayName || 
+                `${data.firstName || ''} ${data.lastName || ''}`.trim() || 
+                'User';
+          membership = data.membershipType || 'Starter';
+        }
+
+        setUserInfo({
+          name,
+          membershipType: membership,
+          image: firebaseUser.photoURL || '👤',  // will show photo if uploaded later
+        });
+      } catch (err) {
+        console.error('Error fetching user info for nav:', err);
+        setUserInfo({
+          name: firebaseUser.displayName || 'User',
+          membershipType: 'Starter',
+          image: '👤',
+        });
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <nav className="fixed top-0 w-full bg-black/90 backdrop-blur-lg border-b border-gray-900 z-50">
@@ -54,10 +114,20 @@ export default function TopNavigation({ onMenuClick }: TopNavigationProps) {
               className="flex items-center space-x-3 p-2 hover:bg-gray-900 rounded-lg transition-colors cursor-pointer"
               onClick={() => router.push('/profile')}
             >
-              <div className="text-3xl">{user.image}</div>
+              <div className="text-3xl">{userInfo.image}</div>
               <div className="hidden sm:block text-left">
-                <div className="text-sm font-semibold">{user.name}</div>
-                <div className="text-xs text-gray-500">{user.membershipType} Member</div>
+                {loading ? (
+                  <div className="text-sm text-gray-400">Loading...</div>
+                ) : (
+                  <>
+                    <div className="text-sm font-semibold">{userInfo.name}</div>
+                    {userInfo.membershipType && (
+                      <div className="text-xs text-gray-500">
+                        {userInfo.membershipType} Member
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </div>
