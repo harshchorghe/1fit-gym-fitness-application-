@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';   // ← adjust path if you use src/
+import { createUserInFirestore } from '@/lib/firestore/users';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -94,15 +95,16 @@ export default function SignUpPage() {
       });
 
       // 3. Save extra data to Firestore
-      await setDoc(doc(db, 'users', user.uid), {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
-        membershipType: formData.membershipType,
-        createdAt: new Date().toISOString(),
-        uid: user.uid,
-      });
+     await createUserInFirestore(user.uid, {
+  firstName: formData.firstName,
+  lastName: formData.lastName,
+  email: formData.email,
+  phone: formData.phone,
+  membershipType: formData.membershipType,
+  createdAt: new Date().toISOString(),
+  uid: user.uid,
+  role: "user"
+})
 
       setSuccessMessage('Account created successfully! Redirecting...');
 

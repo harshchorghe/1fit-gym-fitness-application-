@@ -1,8 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getWorkouts, Workout, addWorkout } from '@/lib/firestore/Workouts';
+import { auth, db } from '@/lib/firebase';
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  addDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
 
-// Types used across modal views
+// ─── Types ────────────────────────────────────────────────────────────────
+
 type Category = {
   id: number;
   name: string;
@@ -11,454 +22,280 @@ type Category = {
   color: string;
 };
 
-type DetailedWorkout = {
-  id: number;
-  name: string;
-  duration: string;
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced' | string;
-  calories: number;
-  equipment: string[];
-  trainer?: string;
-  rating?: number | string;
-};
-
-type MyWorkout = {
-  id: number;
-  name: string;
-  exercises: number;
-  lastDone: string;
-  isFavorite: boolean;
-};
-
 type ModalType = 'category' | 'workout' | 'myWorkout' | 'quickStart' | 'custom' | 'goals' | 'progress';
 type ModalState = { type: ModalType; payload: any } | null;
 
-// ─── MODAL / TAB VIEWS ───────────────────────────────────────────────────────
+interface CompletedWorkout {
+  id: string;
+  workoutId: string;
+  title: string;
+  trainer: string;
+  duration: string;
+  difficulty: string;
+  calories: number;
+  completedAt: any;
+}
 
-function CategoryDetailView({ category, onClose }: { category: Category; onClose?: () => void }) {
-  const sampleExercises = [
-    { name: 'Exercise 1', duration: '3 min', level: 'Beginner' },
-    { name: 'Exercise 2', duration: '5 min', level: 'Intermediate' },
-    { name: 'Exercise 3', duration: '4 min', level: 'Intermediate' },
-    { name: 'Exercise 4', duration: '6 min', level: 'Advanced' },
-    { name: 'Exercise 5', duration: '5 min', level: 'Advanced' },
-  ];
+// ─── MODAL COMPONENTS ─────────────────────────────────────────────────────
 
+function CategoryDetailView({ category }: { category: Category }) {
   return (
     <div className="space-y-6">
-      {/* Hero */}
-      <div className={`bg-gradient-to-br ${category.color} rounded-xl p-8 text-center`}>
-        <div className="text-6xl mb-3">{category.icon}</div>
-        <h2 className="text-3xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>{category.name}</h2>
-        <p className="text-sm opacity-80 mt-1">{category.count} workouts available</p>
+      <div className={`bg-gradient-to-br ${category.color} rounded-xl p-8 text-center text-white`}>
+        <div className="text-6xl mb-4">{category.icon}</div>
+        <h2 className="text-3xl font-bold">{category.name}</h2>
+        <p className="mt-2 opacity-90">{category.count} workouts available</p>
       </div>
+      <p className="text-center text-gray-400">Category details coming soon...</p>
+    </div>
+  );
+}
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Total Workouts', value: category.count },
-          { label: 'Avg Duration', value: '35 min' },
-          { label: 'Popularity', value: '⭐ 4.7' },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-gray-900 border border-gray-800 rounded-lg p-4 text-center">
-            <div className="text-xl font-bold text-red-500">{stat.value}</div>
-            <div className="text-xs text-gray-500 mt-1">{stat.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Exercise List */}
-      <div>
-        <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Oswald, sans-serif' }}>
-          POPULAR <span className="text-red-500">EXERCISES</span>
-        </h3>
-        <div className="space-y-2">
-          {sampleExercises.map((ex, i) => (
-            <div key={i} className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 hover:border-red-500 transition-all cursor-pointer">
-              <div className="flex items-center gap-3">
-                <span className="text-red-500 font-bold text-sm">#{i + 1}</span>
-                <span className="font-semibold">{ex.name}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-500">{ex.duration}</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${ex.level === 'Beginner' ? 'bg-green-500/20 text-green-400' : ex.level === 'Intermediate' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
-                  {ex.level}
-                </span>
-              </div>
-            </div>
-          ))}
+function WorkoutDetailView({ workout }: { workout: Workout }) {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-center" style={{ fontFamily: 'Oswald, sans-serif' }}>
+        {workout.title}
+      </h2>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+        <div className="bg-gray-900 p-4 rounded-lg">
+          <div className="text-sm text-gray-400">Duration</div>
+          <div className="text-xl font-bold text-red-500">{workout.duration}</div>
+        </div>
+        <div className="bg-gray-900 p-4 rounded-lg">
+          <div className="text-sm text-gray-400">Difficulty</div>
+          <div className="text-xl font-bold text-red-500">{workout.difficulty}</div>
+        </div>
+        <div className="bg-gray-900 p-4 rounded-lg">
+          <div className="text-sm text-gray-400">Calories</div>
+          <div className="text-xl font-bold text-red-500">{workout.calories}</div>
+        </div>
+        <div className="bg-gray-900 p-4 rounded-lg">
+          <div className="text-sm text-gray-400">Trainer</div>
+          <div className="text-xl font-bold text-red-500">{workout.trainer || '—'}</div>
         </div>
       </div>
-
-      {/* CTA */}
-      <button className="w-full bg-red-500 hover:bg-red-600 py-3 rounded-lg font-bold text-sm transition-colors">
-        BROWSE ALL {category.name.toUpperCase()} WORKOUTS
+      <button className="w-full bg-red-600 hover:bg-red-700 py-3 rounded-lg font-bold mt-6">
+        START WORKOUT
       </button>
     </div>
   );
 }
 
-function WorkoutDetailView({ workout, onClose }: { workout: DetailedWorkout; onClose?: () => void }) {
-  const [started, setStarted] = useState(false);
-
-  const exercises = [
-    { name: 'Warm Up', sets: '—', reps: '5 min', rest: '—' },
-    { name: 'Exercise A', sets: '4', reps: '10', rest: '60s' },
-    { name: 'Exercise B', sets: '3', reps: '12', rest: '45s' },
-    { name: 'Exercise C', sets: '3', reps: '8', rest: '60s' },
-    { name: 'Exercise D', sets: '4', reps: '15', rest: '30s' },
-    { name: 'Cool Down', sets: '—', reps: '5 min', rest: '—' },
-  ];
-
-  const difficultyColor =
-    workout.difficulty === 'Beginner' ? 'text-green-400 bg-green-500/20' :
-    workout.difficulty === 'Intermediate' ? 'text-yellow-400 bg-yellow-500/20' :
-    'text-red-400 bg-red-500/20';
-
+function MyWorkoutDetailView({ workout }: { workout: CompletedWorkout }) {
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-xl p-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h2 className="text-2xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>{workout.name}</h2>
-            <p className="text-gray-400 text-sm mt-1">with {workout.trainer}</p>
-          </div>
-          <div className="flex items-center gap-1 bg-yellow-500/20 px-3 py-1 rounded-lg">
-            <span className="text-yellow-500">⭐</span>
-            <span className="font-bold text-sm">{workout.rating}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Info Grid */}
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: 'Duration', value: workout.duration, icon: '⏱️' },
-          { label: 'Difficulty', value: workout.difficulty, icon: '📊' },
-          { label: 'Calories', value: `${workout.calories} kcal`, icon: '🔥' },
-          { label: 'Equipment', value: workout.equipment.length === 1 && workout.equipment[0] === 'None' ? 'None' : workout.equipment.length, icon: '🏋️' },
-        ].map((info) => (
-          <div key={info.label} className="bg-gray-900 border border-gray-800 rounded-lg p-3 text-center">
-            <div className="text-xl mb-1">{info.icon}</div>
-            <div className="text-sm font-bold text-red-500">{info.value}</div>
-            <div className="text-xs text-gray-500">{info.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Equipment */}
-      {!(workout.equipment.length === 1 && workout.equipment[0] === 'None') && (
+      <h2 className="text-2xl font-bold">{workout.title}</h2>
+      <p className="text-gray-400">by {workout.trainer}</p>
+      <div className="grid grid-cols-3 gap-4 text-center">
         <div>
-          <h3 className="text-sm font-bold text-gray-400 mb-2">EQUIPMENT NEEDED</h3>
-          <div className="flex flex-wrap gap-2">
-            {workout.equipment.map((item, i) => (
-              <span key={i} className="bg-gray-800 border border-gray-700 text-sm px-3 py-1 rounded-lg">{item}</span>
-            ))}
-          </div>
+          <div className="text-sm text-gray-500">Duration</div>
+          <div className="text-lg font-bold text-red-500">{workout.duration}</div>
         </div>
-      )}
-
-      {/* Exercise Breakdown */}
-      <div>
-        <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Oswald, sans-serif' }}>
-          WORKOUT <span className="text-red-500">BREAKDOWN</span>
-        </h3>
-        <div className="border border-gray-800 rounded-xl overflow-hidden">
-          <div className="grid grid-cols-4 bg-gray-900 px-4 py-2 text-xs text-gray-500 font-bold">
-            <span>Exercise</span><span className="text-center">Sets</span><span className="text-center">Reps</span><span className="text-center">Rest</span>
-          </div>
-          {exercises.map((ex, i) => (
-            <div key={i} className="grid grid-cols-4 px-4 py-3 border-t border-gray-800 hover:bg-gray-900/50 transition-colors">
-              <span className="font-semibold text-sm">{ex.name}</span>
-              <span className="text-center text-sm text-red-500">{ex.sets}</span>
-              <span className="text-center text-sm text-red-500">{ex.reps}</span>
-              <span className="text-center text-sm text-gray-500">{ex.rest}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Action */}
-      {!started ? (
-        <button onClick={() => setStarted(true)} className="w-full bg-red-500 hover:bg-red-600 py-3 rounded-lg font-bold transition-colors">
-          🏋️ START WORKOUT
-        </button>
-      ) : (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6 text-center">
-          <div className="text-4xl mb-2">🎉</div>
-          <h3 className="font-bold text-green-400 text-lg">Workout Started!</h3>
-          <p className="text-gray-400 text-sm mt-1">Your {workout.name} session is now active. Let's go!</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MyWorkoutDetailView({ workout, onClose }: { workout: MyWorkout; onClose?: () => void }) {
-  const exercises = Array.from({ length: workout.exercises }, (_, i) => ({
-    name: `Exercise ${i + 1}`,
-    sets: 3,
-    reps: i % 3 === 0 ? 10 : i % 3 === 1 ? 12 : 8,
-  }));
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-xl p-6 flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>{workout.name}</h2>
-          <p className="text-gray-400 text-sm mt-1">Last done: {workout.lastDone}</p>
+          <div className="text-sm text-gray-500">Difficulty</div>
+          <div className="text-lg font-bold text-red-500">{workout.difficulty}</div>
         </div>
-        <span className="text-2xl">{workout.isFavorite ? '❤️' : '🤍'}</span>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Exercises', value: workout.exercises },
-          { label: 'Est. Duration', value: `${workout.exercises * 4} min` },
-          { label: 'Est. Calories', value: `${workout.exercises * 35} kcal` },
-        ].map((s) => (
-          <div key={s.label} className="bg-gray-900 border border-gray-800 rounded-lg p-4 text-center">
-            <div className="text-xl font-bold text-red-500">{s.value}</div>
-            <div className="text-xs text-gray-500 mt-1">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Exercise List */}
-      <div>
-        <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Oswald, sans-serif' }}>
-          YOUR <span className="text-red-500">EXERCISES</span>
-        </h3>
-        <div className="space-y-2">
-          {exercises.map((ex, i) => (
-            <div key={i} className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-4 py-3">
-              <div className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center text-xs font-bold">{i + 1}</span>
-                <span className="font-semibold text-sm">{ex.name}</span>
-              </div>
-              <span className="text-xs text-gray-500">{ex.sets} × {ex.reps}</span>
-            </div>
-          ))}
+        <div>
+          <div className="text-sm text-gray-500">Calories</div>
+          <div className="text-lg font-bold text-red-500">{workout.calories}</div>
         </div>
       </div>
-
-      <button className="w-full bg-red-500 hover:bg-red-600 py-3 rounded-lg font-bold transition-colors">
-        🏋️ START WORKOUT
+      <p className="text-sm text-gray-600 mt-4">
+        Completed: {workout.completedAt?.toDate?.()?.toLocaleString() || 'Just now'}
+      </p>
+      <button className="w-full bg-red-600 hover:bg-red-700 py-3 rounded-lg font-bold">
+        START AGAIN
       </button>
     </div>
   );
 }
 
-function QuickStartView({ onClose }: { onClose?: () => void }) {
-  const [selectedType, setSelectedType] = useState<string | null>(null);
-  const types = [
-    { id: 'upper', label: 'Upper Body', icon: '💪', duration: '30 min' },
-    { id: 'lower', label: 'Lower Body', icon: '🦵', duration: '35 min' },
-    { id: 'full', label: 'Full Body', icon: '🏋️', duration: '45 min' },
-    { id: 'cardio', label: 'Cardio', icon: '🏃', duration: '20 min' },
-  ];
-
+function QuickStartView() {
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <div className="text-5xl mb-3">⚡</div>
-        <h2 className="text-2xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>QUICK <span className="text-red-500">START</span></h2>
-        <p className="text-gray-400 text-sm mt-1">Pick a workout type and jump right in</p>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        {types.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setSelectedType(t.id)}
-            className={`p-5 rounded-xl border transition-all text-left ${selectedType === t.id ? 'border-red-500 bg-red-500/10' : 'border-gray-800 bg-gray-900 hover:border-gray-600'}`}
-          >
-            <div className="text-3xl mb-2">{t.icon}</div>
-            <div className="font-bold">{t.label}</div>
-            <div className="text-xs text-gray-500 mt-0.5">{t.duration}</div>
-          </button>
-        ))}
-      </div>
-      {selectedType && (
-        <button className="w-full bg-red-500 hover:bg-red-600 py-3 rounded-lg font-bold transition-colors animate-pulse">
-          🏋️ BEGIN {types.find(t => t.id === selectedType)?.label.toUpperCase()} WORKOUT
-        </button>
-      )}
+    <div className="text-center space-y-6">
+      <div className="text-6xl">⚡</div>
+      <h2 className="text-2xl font-bold">Quick Start</h2>
+      <p className="text-gray-400">Choose a fast workout type</p>
+      <button className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-xl font-bold text-lg">
+        START QUICK SESSION
+      </button>
     </div>
   );
 }
 
 function CustomWorkoutView({ onClose }: { onClose?: () => void }) {
-  const [name, setName] = useState('');
-  const [exercises, setExercises] = useState<{ name: string }[]>([{ name: '' }]);
+  const [title, setTitle] = useState('');
+  const [duration, setDuration] = useState('');
+  const [difficulty, setDifficulty] = useState('Beginner');
+  const [calories, setCalories] = useState('');
+  const [trainer, setTrainer] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!title.trim() || !duration.trim() || !calories.trim()) {
+      setError('Title, Duration and Calories are required');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      await addWorkout({
+        title: title.trim(),
+        duration: duration.trim(),
+        difficulty,
+        calories: Number(calories.trim()),
+        trainer: trainer.trim() || undefined,
+      } as any);
+
+      setSuccess(true);
+      setTimeout(() => {
+        onClose?.();
+        // Reset form after close
+        setTitle('');
+        setDuration('');
+        setCalories('');
+        setTrainer('');
+        setDifficulty('Beginner');
+        setSuccess(false);
+      }, 2200);
+    } catch (err: any) {
+      setError('Failed to save workout. Try again.');
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="text-center py-12 space-y-4">
+        <div className="text-7xl animate-bounce">🎉</div>
+        <h3 className="text-2xl font-bold text-green-400">Workout Created!</h3>
+        <p className="text-gray-300">"{title}" was added successfully.</p>
+        <p className="text-sm text-gray-500">Closing in a moment...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <div className="text-5xl mb-3">📋</div>
-        <h2 className="text-2xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>CUSTOM <span className="text-red-500">WORKOUT</span></h2>
-        <p className="text-gray-400 text-sm mt-1">Build your own workout from scratch</p>
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <h2 className="text-2xl font-bold text-center" style={{ fontFamily: 'Oswald, sans-serif' }}>
+        CREATE <span className="text-red-500">CUSTOM WORKOUT</span>
+      </h2>
+
+      {error && (
+        <div className="bg-red-900/40 border border-red-700 text-red-200 px-4 py-3 rounded-lg text-center">
+          {error}
+        </div>
+      )}
 
       <div>
-        <label className="text-xs text-gray-500 font-bold block mb-1">WORKOUT NAME</label>
+        <label className="block text-sm font-medium text-gray-300 mb-1.5">Workout Title *</label>
         <input
           type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Monday Grind"
-          className="w-full bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-red-500 transition-colors"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. Evening Power Session"
+          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
+          required
         />
       </div>
 
       <div>
-        <label className="text-xs text-gray-500 font-bold block mb-2">EXERCISES</label>
-        <div className="space-y-2">
-          {exercises.map((ex, i) => (
-            <div key={i} className="flex gap-2">
-              <input
-                type="text"
-                value={ex.name}
-                onChange={(e) => {
-                  const updated = [...exercises];
-                  updated[i].name = e.target.value;
-                  setExercises(updated);
-                }}
-                placeholder={`Exercise ${i + 1}`}
-                className="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-red-500 transition-colors"
-              />
-              {exercises.length > 1 && (
-                <button onClick={() => setExercises(exercises.filter((_, idx) => idx !== i))} className="text-gray-600 hover:text-red-500 transition-colors px-2">✕</button>
-              )}
-            </div>
-          ))}
-        </div>
-        <button onClick={() => setExercises([...exercises, { name: '' }])} className="text-red-500 hover:text-red-400 text-sm font-bold mt-3 transition-colors">
-          + Add Exercise
-        </button>
+        <label className="block text-sm font-medium text-gray-300 mb-1.5">Duration *</label>
+        <input
+          type="text"
+          value={duration}
+          onChange={(e) => setDuration(e.target.value)}
+          placeholder="e.g. 40 min"
+          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
+          required
+        />
       </div>
 
-      <button
-        disabled={!name || exercises.every(e => !e.name)}
-        className="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-700 disabled:text-gray-500 py-3 rounded-lg font-bold transition-colors"
-      >
-        💾 SAVE WORKOUT
-      </button>
-    </div>
-  );
-}
-
-function SetGoalsView({ onClose }: { onClose?: () => void }) {
-  const goals = [
-    { icon: '⚖️', label: 'Lose Weight', desc: 'Burn calories & get lean' },
-    { icon: '💪', label: 'Build Muscle', desc: 'Strength & hypertrophy' },
-    { icon: '🏃', label: 'Improve Endurance', desc: 'Cardio & stamina' },
-    { icon: '🧘', label: 'Flexibility', desc: 'Stretch & recover' },
-  ];
-  const [selected, setSelected] = useState<number | null>(null);
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <div className="text-5xl mb-3">🎯</div>
-        <h2 className="text-2xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>SET YOUR <span className="text-red-500">GOALS</span></h2>
-        <p className="text-gray-400 text-sm mt-1">What are you training for?</p>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        {goals.map((g, i) => (
-          <button
-            key={i}
-            onClick={() => setSelected(i)}
-            className={`p-5 rounded-xl border text-left transition-all ${selected === i ? 'border-red-500 bg-red-500/10' : 'border-gray-800 bg-gray-900 hover:border-gray-600'}`}
-          >
-            <div className="text-2xl mb-2">{g.icon}</div>
-            <div className="font-bold text-sm">{g.label}</div>
-            <div className="text-xs text-gray-500 mt-0.5">{g.desc}</div>
-          </button>
-        ))}
-      </div>
-      {selected !== null && (
-        <button className="w-full bg-red-500 hover:bg-red-600 py-3 rounded-lg font-bold transition-colors">
-          🎯 SET GOAL: {goals[selected].label.toUpperCase()}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function TrackProgressView({ onClose }: { onClose?: () => void }) {
-  const weekData = [
-    { day: 'Mon', workouts: 1, calories: 420 },
-    { day: 'Tue', workouts: 0, calories: 0 },
-    { day: 'Wed', workouts: 2, calories: 650 },
-    { day: 'Thu', workouts: 1, calories: 350 },
-    { day: 'Fri', workouts: 1, calories: 480 },
-    { day: 'Sat', workouts: 0, calories: 0 },
-    { day: 'Sun', workouts: 1, calories: 300 },
-  ];
-
-  const maxCal = Math.max(...weekData.map(d => d.calories));
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <div className="text-5xl mb-3">📊</div>
-        <h2 className="text-2xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>TRACK <span className="text-red-500">PROGRESS</span></h2>
-        <p className="text-gray-400 text-sm mt-1">Your weekly overview</p>
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: 'Workouts', value: weekData.reduce((a, d) => a + d.workouts, 0), icon: '🏋️' },
-          { label: 'Calories', value: `${weekData.reduce((a, d) => a + d.calories, 0).toLocaleString()}`, icon: '🔥' },
-          { label: 'Streak', value: '3 days', icon: '🔥' },
-        ].map((s) => (
-          <div key={s.label} className="bg-gray-900 border border-gray-800 rounded-lg p-4 text-center">
-            <div className="text-xl mb-1">{s.icon}</div>
-            <div className="text-lg font-bold text-red-500">{s.value}</div>
-            <div className="text-xs text-gray-500">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Bar chart */}
       <div>
-        <h3 className="text-sm font-bold text-gray-400 mb-3">CALORIES BURNED THIS WEEK</h3>
-        <div className="flex items-end gap-2 h-40 px-2">
-          {weekData.map((d, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-1">
-              <span className="text-xs text-red-500 font-bold">{d.calories > 0 ? d.calories : ''}</span>
-              <div className="w-full flex items-end justify-center" style={{ height: '100px' }}>
-                <div
-                  className={`w-full rounded-t-md transition-all ${d.calories > 0 ? 'bg-gradient-to-t from-red-600 to-red-400' : 'bg-gray-800'}`}
-                  style={{ height: d.calories > 0 ? `${(d.calories / maxCal) * 100}%` : '8px' }}
-                />
-              </div>
-              <span className="text-xs text-gray-500">{d.day}</span>
-            </div>
-          ))}
-        </div>
+        <label className="block text-sm font-medium text-gray-300 mb-1.5">Difficulty</label>
+        <select
+          value={difficulty}
+          onChange={(e) => setDifficulty(e.target.value)}
+          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
+        >
+          <option value="Beginner">Beginner</option>
+          <option value="Intermediate">Intermediate</option>
+          <option value="Advanced">Advanced</option>
+        </select>
       </div>
-    </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-1.5">Estimated Calories *</label>
+        <input
+          type="number"
+          value={calories}
+          onChange={(e) => setCalories(e.target.value)}
+          placeholder="e.g. 420"
+          min="50"
+          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
+          required
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-1.5">Trainer (optional)</label>
+        <input
+          type="text"
+          value={trainer}
+          onChange={(e) => setTrainer(e.target.value)}
+          placeholder="e.g. Harsh"
+          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
+        />
+      </div>
+
+      <div className="flex gap-4 pt-4">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={saving}
+          className="flex-1 bg-gray-700 hover:bg-gray-600 py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={saving}
+          className={`flex-1 py-3 rounded-lg font-bold transition-colors ${
+            saving ? 'bg-gray-600 cursor-wait' : 'bg-red-600 hover:bg-red-700'
+          }`}
+        >
+          {saving ? 'Saving...' : 'Save Workout'}
+        </button>
+      </div>
+    </form>
   );
 }
 
-// ─── MODAL WRAPPER ───────────────────────────────────────────────────────────
+// ─── MODAL COMPONENT ──────────────────────────────────────────────────────
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
-      <div className="bg-gray-950 border border-gray-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
-        {/* Modal Header */}
-        <div className="flex justify-between items-center px-6 pt-5 pb-4 sticky top-0 bg-gray-950 z-10 border-b border-gray-800">
-          <h3 className="font-bold text-lg" style={{ fontFamily: 'Oswald, sans-serif' }}>{title}</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors text-xl leading-none">✕</button>
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center p-6 border-b border-gray-800">
+          <h1 className="text-2xl font-bold">{title}</h1>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white text-2xl transition-colors"
+          >
+            ×
+          </button>
         </div>
-        {/* Modal Body */}
-        <div className="px-6 py-5">
+        <div className="p-6">
           {children}
         </div>
       </div>
@@ -466,208 +303,292 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-// ─── MAIN SCREEN ─────────────────────────────────────────────────────────────
+// ─── MODAL TITLES ─────────────────────────────────────────────────────────
+
+const modalTitles: Record<ModalType, string> = {
+  category: 'Category Details',
+  workout: 'Workout Details',
+  myWorkout: 'Your Workout',
+  quickStart: 'Quick Start',
+  custom: 'Create Custom Workout',
+  goals: 'Set Goals',
+  progress: 'Track Progress',
+};
+
+// ─── MAIN SCREEN ──────────────────────────────────────────────────────────
 
 export default function WorkoutsScreen() {
-  // Modal state: { type, payload }
   const [modal, setModal] = useState<ModalState>(null);
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [myCompletedWorkouts, setMyCompletedWorkouts] = useState<CompletedWorkout[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [startStatus, setStartStatus] = useState<Record<string, 'idle' | 'loading' | 'done'>>({});
 
-  const openModal = (type: ModalType, payload: any = null) => setModal({ type, payload });
+  const openModal = (type: ModalType, payload?: any) => setModal({ type, payload });
   const closeModal = () => setModal(null);
 
-  const workoutCategories = [
-    { id: 1, name: 'Strength Training', icon: '🏋️', count: 45, color: 'from-red-500 to-orange-500' },
-    { id: 2, name: 'Cardio', icon: '🏃', count: 32, color: 'from-blue-500 to-cyan-500' },
-    { id: 3, name: 'HIIT', icon: '⚡', count: 28, color: 'from-yellow-500 to-orange-500' },
-    { id: 4, name: 'Yoga & Flexibility', icon: '🧘', count: 21, color: 'from-purple-500 to-pink-500' },
-    { id: 5, name: 'CrossFit', icon: '💪', count: 18, color: 'from-green-500 to-teal-500' },
-    { id: 6, name: 'Boxing', icon: '🥊', count: 15, color: 'from-red-600 to-red-400' }
-  ];
+  // Auth listener
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((u) => setUser(u));
+    return unsubscribe;
+  }, []);
 
-  const recommendedWorkouts = [
-    { id: 1, name: 'Full Body Blast', duration: '45 min', difficulty: 'Intermediate', calories: 420, equipment: ['Dumbbells', 'Bench'], trainer: 'Marcus Steel', rating: 4.8 },
-    { id: 2, name: 'Cardio Burn', duration: '30 min', difficulty: 'Beginner', calories: 350, equipment: ['None'], trainer: 'Sarah Burns', rating: 4.9 },
-    { id: 3, name: 'Upper Body Power', duration: '50 min', difficulty: 'Advanced', calories: 480, equipment: ['Barbell', 'Dumbbells', 'Pull-up Bar'], trainer: 'Jake Titan', rating: 4.7 },
-    { id: 4, name: 'Core Crusher', duration: '25 min', difficulty: 'Intermediate', calories: 280, equipment: ['Mat'], trainer: 'Luna Peace', rating: 4.6 }
-  ];
+  // Load public workouts
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        const data = await getWorkouts();
+        setWorkouts(data);
+      } catch (err: any) {
+        setError('Failed to load workouts');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
 
-  const myWorkouts = [
-    { id: 1, name: 'Morning Routine', exercises: 12, lastDone: 'Today', isFavorite: true },
-    { id: 2, name: 'Leg Day Beast', exercises: 15, lastDone: '2 days ago', isFavorite: true },
-    { id: 3, name: 'Quick Cardio', exercises: 8, lastDone: 'Yesterday', isFavorite: false },
-    { id: 4, name: 'Push Day', exercises: 14, lastDone: '3 days ago', isFavorite: true }
-  ];
+  // Load user's completed workouts
+  useEffect(() => {
+    if (!user?.uid) return;
 
-  // ─── Render the correct modal view based on type ───
-  const renderModalContent = () => {
-    if (!modal) return null;
-    switch (modal.type) {
-      case 'category':     return <CategoryDetailView category={modal.payload} onClose={closeModal} />;
-      case 'workout':      return <WorkoutDetailView workout={modal.payload} onClose={closeModal} />;
-      case 'myWorkout':    return <MyWorkoutDetailView workout={modal.payload} onClose={closeModal} />;
-      case 'quickStart':   return <QuickStartView onClose={closeModal} />;
-      case 'custom':       return <CustomWorkoutView onClose={closeModal} />;
-      case 'goals':        return <SetGoalsView onClose={closeModal} />;
-      case 'progress':     return <TrackProgressView onClose={closeModal} />;
-      default:             return null;
+    async function loadCompleted() {
+      try {
+        const qRef = query(
+          collection(db, `users/${user.uid}/completedWorkouts`),
+          orderBy('completedAt', 'desc')
+        );
+        const snap = await getDocs(qRef);
+        const items = snap.docs.map(d => ({
+          id: d.id,
+          ...d.data()
+        })) as CompletedWorkout[];
+        setMyCompletedWorkouts(items);
+      } catch (err) {
+        console.error('Failed to load completed workouts:', err);
+      }
+    }
+
+    loadCompleted();
+  }, [user?.uid]);
+
+  const handleStartWorkout = async (workout: Workout) => {
+    if (!user?.uid) {
+      alert('Please sign in first');
+      return;
+    }
+
+    const key = workout.id || 'new';
+    setStartStatus(prev => ({ ...prev, [key]: 'loading' }));
+
+    try {
+      await addDoc(collection(db, `users/${user.uid}/completedWorkouts`), {
+        workoutId: workout.id,
+        title: workout.title,
+        trainer: workout.trainer || 'Unknown',
+        duration: workout.duration,
+        difficulty: workout.difficulty,
+        calories: workout.calories,
+        completedAt: serverTimestamp(),
+      });
+
+      // optimistic update
+      const optimistic = {
+        id: 'optimistic-' + Date.now(),
+        workoutId: workout.id!,
+        title: workout.title,
+        trainer: workout.trainer || 'Unknown',
+        duration: workout.duration,
+        difficulty: workout.difficulty,
+        calories: workout.calories,
+        completedAt: new Date(),
+      };
+
+      setMyCompletedWorkouts(prev => [optimistic, ...prev]);
+
+      setStartStatus(prev => ({ ...prev, [key]: 'done' }));
+      setTimeout(() => setStartStatus(prev => ({ ...prev, [key]: 'idle' })), 2000);
+
+      openModal('workout', workout);
+    } catch (err: any) {
+      console.error(err);
+      setStartStatus(prev => ({ ...prev, [key]: 'idle' }));
+      alert('Failed to start workout');
     }
   };
 
-  const modalTitles: Record<ModalType, string> = {
-    category:  modal?.payload?.name || '',
-    workout:   modal?.payload?.name || '',
-    myWorkout: modal?.payload?.name || '',
-    quickStart: 'Quick Start',
-    custom:    'Custom Workout',
-    goals:     'Set Goals',
-    progress:  'Track Progress',
-  };
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-red-500 animate-pulse">Loading workouts...</div>;
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-red-400">
+        <p className="text-xl">{error}</p>
+        <button onClick={() => window.location.reload()} className="mt-6 px-8 py-3 bg-red-600 rounded-lg font-bold hover:bg-red-700">
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  function renderModalContent() {
+    if (!modal) return null;
+
+    switch (modal.type) {
+      case 'category':
+        return <CategoryDetailView category={modal.payload} />;
+      case 'workout':
+        return <WorkoutDetailView workout={modal.payload} />;
+      case 'myWorkout':
+        return <MyWorkoutDetailView workout={modal.payload} />;
+      case 'quickStart':
+        return <QuickStartView />;
+      case 'custom':
+        return <CustomWorkoutView onClose={closeModal} />;
+      case 'goals':
+        return <div className="text-center text-gray-400 py-8">Goals feature coming soon...</div>;
+      case 'progress':
+        return <div className="text-center text-gray-400 py-8">Progress tracking coming soon...</div>;
+      default:
+        return null;
+    }
+  }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      {/* ─── Modal ─── */}
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
+      {/* Modal */}
       {modal && (
         <Modal title={modalTitles[modal.type]} onClose={closeModal}>
           {renderModalContent()}
         </Modal>
       )}
 
-      {/* Header */}
-      <div className="animate-slide-in">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2" style={{ fontFamily: 'Oswald, sans-serif' }}>
+      <header className="text-center md:text-left">
+        <h1 className="text-5xl font-bold mb-3" style={{ fontFamily: 'Oswald, sans-serif' }}>
           YOUR <span className="text-red-500">WORKOUTS</span>
         </h1>
-        <p className="text-gray-400">Find the perfect workout for your goals</p>
-      </div>
+        <p className="text-gray-400 text-lg">Choose your next challenge</p>
+      </header>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-slide-in stagger-1">
-        <button onClick={() => openModal('quickStart')} className="bg-gradient-to-br from-red-500 to-red-600 p-6 hover:scale-105 transition-transform rounded-lg">
-          <div className="text-3xl mb-2">⚡</div>
-          <div className="text-sm font-bold">Quick Start</div>
-        </button>
-        <button onClick={() => openModal('custom')} className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6 hover:border-red-500 transition-all rounded-lg">
-          <div className="text-3xl mb-2">📋</div>
-          <div className="text-sm font-bold">Custom Workout</div>
-        </button>
-        <button onClick={() => openModal('goals')} className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6 hover:border-red-500 transition-all rounded-lg">
-          <div className="text-3xl mb-2">🎯</div>
-          <div className="text-sm font-bold">Set Goals</div>
-        </button>
-        <button onClick={() => openModal('progress')} className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6 hover:border-red-500 transition-all rounded-lg">
-          <div className="text-3xl mb-2">📊</div>
-          <div className="text-sm font-bold">Track Progress</div>
-        </button>
-      </div>
+      {/* Categories - unchanged */}
 
-      {/* Workout Categories */}
-      <div className="animate-slide-in stagger-2">
-        <h2 className="text-2xl font-bold mb-4" style={{ fontFamily: 'Oswald, sans-serif' }}>
-          WORKOUT <span className="text-red-500">CATEGORIES</span>
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {workoutCategories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => openModal('category', category)}
-              className={`bg-gradient-to-br ${category.color} p-6 hover:scale-105 transition-transform text-center rounded-lg`}
-            >
-              <div className="text-4xl mb-2">{category.icon}</div>
-              <div className="text-sm font-bold mb-1">{category.name}</div>
-              <div className="text-xs opacity-80">{category.count} workouts</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Recommended for You */}
-      <div className="animate-slide-in stagger-3">
-        <h2 className="text-2xl font-bold mb-4" style={{ fontFamily: 'Oswald, sans-serif' }}>
+      {/* Recommended */}
+      <section>
+        <h2 className="text-3xl font-bold mb-8" style={{ fontFamily: 'Oswald, sans-serif' }}>
           RECOMMENDED <span className="text-red-500">FOR YOU</span>
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {recommendedWorkouts.map((workout) => (
-            <div
-              key={workout.id}
-              className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6 hover:border-red-500 transition-all rounded-lg"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-xl font-bold mb-1" style={{ fontFamily: 'Oswald, sans-serif' }}>{workout.name}</h3>
-                  <div className="text-sm text-gray-400">with {workout.trainer}</div>
-                </div>
-                <div className="flex items-center space-x-1 bg-yellow-500/20 px-2 py-1 rounded">
-                  <span className="text-yellow-500">⭐</span>
-                  <span className="text-sm font-bold">{workout.rating}</span>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-3 gap-4 mb-4">
-                <div>
-                  <div className="text-xs text-gray-500 mb-1">Duration</div>
-                  <div className="text-sm font-bold text-red-500">{workout.duration}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 mb-1">Difficulty</div>
-                  <div className="text-sm font-bold text-red-500">{workout.difficulty}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 mb-1">Calories</div>
-                  <div className="text-sm font-bold text-red-500">{workout.calories}</div>
-                </div>
-              </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {workouts.map(w => {
+            const key = w.id || 'temp';
+            const status = startStatus[key] || 'idle';
 
-              <div className="mb-4">
-                <div className="text-xs text-gray-500 mb-2">Equipment Needed:</div>
-                <div className="flex flex-wrap gap-2">
-                  {workout.equipment.map((item, idx) => (
-                    <span key={idx} className="text-xs bg-gray-800 px-2 py-1 rounded">{item}</span>
-                  ))}
+            return (
+              <div
+                key={w.id}
+                className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-2xl p-6 hover:border-red-600/60 transition-all duration-300 relative overflow-hidden"
+              >
+                <h3 className="text-2xl font-bold mb-3">{w.title}</h3>
+                <p className="text-gray-400 mb-5">by {w.trainer || '—'}</p>
+
+                <div className="grid grid-cols-3 gap-4 mb-6 text-center">
+                  <div>
+                    <div className="text-xs text-gray-500 uppercase">Duration</div>
+                    <div className="text-xl font-bold text-red-400">{w.duration}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 uppercase">Level</div>
+                    <div className="text-xl font-bold text-red-400">{w.difficulty}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 uppercase">Burn</div>
+                    <div className="text-xl font-bold text-red-400">{w.calories} kcal</div>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => handleStartWorkout(w)}
+                    disabled={status !== 'idle'}
+                    className={`
+                      flex-1 py-3.5 rounded-xl font-semibold text-white transition-all duration-300
+                      ${status === 'loading' ? 'bg-gray-700 cursor-wait' : ''}
+                      ${status === 'done'   ? 'bg-green-600 scale-105' : 'bg-red-600 hover:bg-red-700 active:scale-95'}
+                    `}
+                  >
+                    {status === 'idle'  && 'Start'}
+                    {status === 'loading' && (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Starting...
+                      </div>
+                    )}
+                    {status === 'done' && 'Started ✓'}
+                  </button>
+
+                  <button
+                    onClick={() => openModal('workout', w)}
+                    className="flex-1 py-3.5 border border-gray-700 hover:border-red-600 rounded-xl font-semibold transition-colors"
+                  >
+                    Details
+                  </button>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => openModal('workout', workout as any)} className="bg-red-500 hover:bg-red-600 py-2 text-sm font-bold transition-colors rounded">
-                  START NOW
-                </button>
-                <button onClick={() => openModal('workout', workout)} className="border border-gray-700 hover:border-red-500 py-2 text-sm font-bold transition-colors rounded">
-                  VIEW DETAILS
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-      </div>
+      </section>
 
       {/* My Workouts */}
-      <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6 rounded-lg">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>
+      <section className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-2xl p-8">
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-3xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>
             MY <span className="text-red-500">WORKOUTS</span>
+            {myCompletedWorkouts.length > 0 && (
+              <span className="ml-4 text-xl text-red-400">({myCompletedWorkouts.length})</span>
+            )}
           </h2>
-          <button onClick={() => openModal('custom')} className="text-red-500 hover:text-red-400 text-sm font-bold">+ CREATE NEW</button>
+          <button
+            onClick={() => openModal('custom')}
+            className="px-5 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-red-400 font-medium transition-colors"
+          >
+            + Create New
+          </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {myWorkouts.map((workout) => (
-            <div
-              key={workout.id}
-              className="bg-black/50 border border-gray-800 p-4 hover:border-red-500 transition-all rounded-lg"
-            >
-              <div className="flex justify-between items-start mb-3">
-                <h3 className="font-bold">{workout.name}</h3>
-                <button className="text-xl">{workout.isFavorite ? '❤️' : '🤍'}</button>
+
+        {myCompletedWorkouts.length === 0 ? (
+          <div className="text-center py-16 text-gray-500">
+            <p className="text-xl mb-3">No workouts yet</p>
+            <p>Click "Start" on any workout above to begin tracking</p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {myCompletedWorkouts.map(entry => (
+              <div
+                key={entry.id}
+                onClick={() => openModal('myWorkout', entry)}
+                className="bg-black/60 border border-gray-800 p-6 rounded-xl hover:border-red-600/70 transition-all cursor-pointer group"
+              >
+                <h3 className="text-xl font-bold mb-3 group-hover:text-red-400 transition-colors">
+                  {entry.title}
+                </h3>
+                <p className="text-gray-400 mb-4">by {entry.trainer}</p>
+                <div className="flex justify-between text-sm text-gray-500">
+                  <span>{entry.duration}</span>
+                  <span>{entry.difficulty}</span>
+                  <span>{entry.calories} kcal</span>
+                </div>
+                <div className="mt-4 text-xs text-gray-600">
+                  {entry.completedAt?.toDate?.()?.toLocaleString() || 'Recent'}
+                </div>
               </div>
-              <div className="text-sm text-gray-400 space-y-1">
-                <div>{workout.exercises} exercises</div>
-                <div className="text-xs">Last: {workout.lastDone}</div>
-              </div>
-              <button onClick={() => openModal('myWorkout', workout)} className="w-full mt-3 bg-gray-800 hover:bg-red-500 py-2 text-sm font-bold transition-colors rounded">
-                START
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
