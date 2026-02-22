@@ -32,6 +32,7 @@ export interface GymClass {
 }
 
 export interface UserBookedClass {
+  duration: string;
   id: string;             // = class id
   title: string;
   trainer: string;

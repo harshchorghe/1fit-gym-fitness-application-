@@ -93,6 +93,7 @@ export default function ClassesScreen() {
         intensity: cls.intensity,
         bookedAt: new Date(),
         status: 'confirmed',
+        duration: cls.duration,     // ← added this line to fix the type error
       };
 
       setMyBookings((prev) => [newBooking, ...prev]);
@@ -152,7 +153,7 @@ export default function ClassesScreen() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
-      {/* Header & Filters (same as before) */}
+      {/* Header & Filters */}
       <header className="text-center md:text-left">
         <h1 className="text-5xl font-bold mb-3" style={{ fontFamily: 'Oswald, sans-serif' }}>
           GROUP <span className="text-red-500">CLASSES</span>
@@ -177,13 +178,12 @@ export default function ClassesScreen() {
         ))}
       </div>
 
-      {/* My Bookings Section (same) */}
+      {/* My Bookings Section */}
       <section className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-2xl p-8">
         <h2 className="text-3xl font-bold mb-6" style={{ fontFamily: 'Oswald, sans-serif' }}>
           YOUR <span className="text-red-500">BOOKINGS</span>
           {myBookings.length > 0 && <span className="ml-4 text-xl text-red-400">({myBookings.length})</span>}
         </h2>
-        {/* ... rest of your bookings grid (unchanged) ... */}
         {myBookings.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <p className="text-xl">No bookings yet</p>
@@ -212,7 +212,7 @@ export default function ClassesScreen() {
         )}
       </section>
 
-      {/* Today's Classes (same as before) */}
+      {/* Today's Classes */}
       <section>
         <h2 className="text-3xl font-bold mb-8" style={{ fontFamily: 'Oswald, sans-serif' }}>
           TODAY'S <span className="text-red-500">CLASSES</span>
