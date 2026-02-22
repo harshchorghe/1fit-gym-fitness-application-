@@ -1,40 +1,83 @@
-import { db } from "../firebase"
+import { db } from "../firebase";
 import {
   doc,
   setDoc,
   getDoc,
-  updateDoc
-} from "firebase/firestore"
+  updateDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 
 export interface UserData {
-  firstName: string
-  lastName: string
-  email: string
-  phone: string
-  membershipType: string
-  createdAt: string
-  uid: string
-  role?: "user" | "admin"
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  membershipType: string;
+  createdAt: any;          // serverTimestamp() returns Timestamp
+  uid: string;
+  role?: 'user' | 'admin' | 'trainer';
 }
 
-// Create user document
+// Create or overwrite user document
 export const createUserInFirestore = async (
   uid: string,
-  userData: UserData
+  userData: Omit<UserData, 'uid' | 'createdAt' | 'role'> & { role?: UserData['role'] }
 ) => {
-  await setDoc(doc(db, "users", uid), userData)
-}
+  try {
+    const fullData = {
+      ...userData,
+      uid,
+      createdAt: serverTimestamp(),
+      role: userData.role ?? 'user',
+    };
 
-// Get single user
+    await setDoc(doc(db, "users", uid), fullData);
+    console.log("User created:", uid);
+    return true;
+  } catch (error) {
+    console.error("Create user failed:", error);
+    throw error;
+  }
+};
+
+// Get user data
 export const getUserData = async (uid: string) => {
-  const snapshot = await getDoc(doc(db, "users", uid))
-  return snapshot.exists() ? snapshot.data() : null
-}
+  try {
+    const snapshot = await getDoc(doc(db, "users", uid));
+    if (snapshot.exists()) {
+      return snapshot.data() as UserData;
+    }
+    return null;
+  } catch (error) {
+    console.error("Get user failed:", error);
+    return null;
+  }
+};
 
-// Update user
+// Safe partial update
 export const updateUserData = async (
   uid: string,
-  updatedData: Partial<UserData>
+  updatedData: Partial<Omit<UserData, 'uid' | 'createdAt'>>
 ) => {
-  await updateDoc(doc(db, "users", uid), updatedData)
-}
+  try {
+    const userRef = doc(db, "users", uid);
+    await updateDoc(userRef, updatedData);
+    console.log("User updated:", uid);
+  } catch (error) {
+    console.error("Update failed:", error);
+    throw error;
+  }
+};
+
+// Check whether a user is an admin (backwards-compatible with `isAdmin` boolean)
+export const isUserAdmin = async (uid: string): Promise<boolean> => {
+  try {
+    const snapshot = await getDoc(doc(db, 'users', uid));
+    if (!snapshot.exists()) return false;
+    const data = snapshot.data() as Partial<UserData & { isAdmin?: boolean }>;
+    return data.isAdmin === true || data.role === 'admin';
+  } catch (err) {
+    console.error('isUserAdmin check failed:', err);
+    return false;
+  }
+};
