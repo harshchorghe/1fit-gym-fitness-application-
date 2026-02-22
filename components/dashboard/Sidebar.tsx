@@ -1,10 +1,9 @@
-// Sidebar.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { auth } from '@/lib/firebase';
-import { incrementDailyStreak, hasClaimedStreakToday } from '@/lib/firestore/users';
+import { getUserData, incrementDailyStreak, hasClaimedStreakToday } from '@/lib/firestore/users';
 
 interface SidebarProps {
   isSidebarOpen: boolean;
@@ -14,12 +13,38 @@ interface SidebarProps {
 export default function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [streak, setStreak] = useState(12);           // ← fallback / initial
+  const [streak, setStreak] = useState(0);
   const [claiming, setClaiming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [streakClaimed, setStreakClaimed] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // You can load real streak here too (optional)
-  // useEffect(() => { ... fetch user streak ... }, []);
+  // Load real streak from Firestore
+  useEffect(() => {
+    async function loadStreak() {
+      const user = auth.currentUser;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const userData = await getUserData(user.uid);
+        if (userData) {
+          setStreak(userData.streak || 0);
+        }
+
+        const claimed = await hasClaimedStreakToday(user.uid);
+        setStreakClaimed(claimed);
+      } catch (error) {
+        console.error("Failed to load streak:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadStreak();
+  }, []);
 
   const navigationItems = [
     { name: 'Overview', icon: '📊', path: '/home/overview' },
@@ -38,13 +63,17 @@ export default function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
       return;
     }
 
+    if (streakClaimed) {
+      setMessage("You've already claimed your streak today!");
+      return;
+    }
+
     setClaiming(true);
     try {
       const newStreak = await incrementDailyStreak(user.uid);
-      if (newStreak === null) {
-        setMessage("You've already claimed your streak today!");
-      } else {
+      if (newStreak !== null) {
         setStreak(newStreak);
+        setStreakClaimed(true);
         setMessage(`Streak updated! Current: ${newStreak} 🔥`);
       }
     } catch (err: any) {
@@ -83,14 +112,16 @@ export default function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
       <div className="p-4 border-t border-gray-800">
         <button
           onClick={handleClaimStreak}
-          disabled={claiming}
+          disabled={claiming || streakClaimed || loading}
           className={`w-full flex items-center justify-center space-x-3 px-4 py-3 rounded-lg font-semibold transition-all mb-4 ${
-            claiming 
+            streakClaimed || loading
               ? 'bg-gray-700 cursor-not-allowed' 
+              : claiming
+              ? 'bg-gray-700 cursor-not-allowed'
               : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white'
           }`}
         >
-          <span className="text-xl">🔥 Claim Daily Streak</span>
+          <span className="text-xl">{streakClaimed ? '✓' : '🔥'} {streakClaimed ? 'Claimed Today' : 'Claim Daily Streak'}</span>
         </button>
 
         {message && (
@@ -108,12 +139,12 @@ export default function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
             <div>
               <div className="text-xs text-gray-400">Current Streak</div>
               <div className="text-xl font-bold text-red-500" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                {streak} Days
+                {loading ? '...' : `${streak} Days`}
               </div>
             </div>
           </div>
           <div className="text-xs text-gray-400 mt-2">
-            Keep it going! {streak >= 12 ? 'Amazing!' : `Only ${15 - streak} more to unlock 15-day badge.`}
+            Keep it going! {streak >= 15 ? '🎉 Amazing!' : `Only ${Math.max(0, 15 - streak)} more to unlock 15-day badge.`}
           </div>
         </div>
       </div>
