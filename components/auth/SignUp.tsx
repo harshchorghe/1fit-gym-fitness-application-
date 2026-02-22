@@ -95,16 +95,14 @@ export default function SignUpPage() {
       });
 
       // 3. Save extra data to Firestore
-     await createUserInFirestore(user.uid, {
-  firstName: formData.firstName,
-  lastName: formData.lastName,
-  email: formData.email,
-  phone: formData.phone,
-  membershipType: formData.membershipType,
-  createdAt: new Date().toISOString(),
-  uid: user.uid,
-  role: "user"
-})
+      await createUserInFirestore(user.uid, {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        membershipType: formData.membershipType,
+        role: 'user',
+      });
 
       setSuccessMessage('Account created successfully! Redirecting...');
 
