@@ -7,6 +7,7 @@ import { doc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { adminAddWorkout } from '@/lib/firestore/admin';
 import { adminAddClass } from '@/lib/firestore/admin';
+import { adminAddMealPlan } from '@/lib/firestore/admin'; // ← make sure this is imported
 
 export default function AdminDashboard() {
   const [user, setUser] = useState<any>(null);
@@ -33,6 +34,15 @@ export default function AdminDashboard() {
     intensity: 'Low',
     capacity: 15,
     startTimeDate: '', // we'll convert to timestamp
+  });
+
+  // NEW: Meal Plan form state
+  const [mealPlanForm, setMealPlanForm] = useState({
+    name: '',
+    calories: '',
+    protein: '',
+    description: '',
+    duration: 'Ongoing',
   });
 
   useEffect(() => {
@@ -95,6 +105,30 @@ export default function AdminDashboard() {
         intensity: 'Low',
         capacity: 15,
         startTimeDate: '',
+      });
+    } catch (err: any) {
+      setMessage('Error: ' + err.message);
+    }
+  };
+
+  // NEW: Handle Meal Plan submission
+  const handleMealPlanSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await adminAddMealPlan(user.uid, {
+        name: mealPlanForm.name.trim(),
+        calories: Number(mealPlanForm.calories),
+        protein: Number(mealPlanForm.protein),
+        description: mealPlanForm.description.trim(),
+        duration: mealPlanForm.duration.trim(),
+      });
+      setMessage('Meal Plan added successfully!');
+      setMealPlanForm({
+        name: '',
+        calories: '',
+        protein: '',
+        description: '',
+        duration: 'Ongoing',
       });
     } catch (err: any) {
       setMessage('Error: ' + err.message);
@@ -239,6 +273,54 @@ export default function AdminDashboard() {
           />
           <button type="submit" className="w-full bg-red-600 py-3 rounded font-bold hover:bg-red-700">
             Add Class
+          </button>
+        </form>
+      </section>
+
+      {/* NEW: Meal Plan Form – added below your class form */}
+      <section className="bg-gray-900 p-8 rounded-xl border border-gray-700">
+        <h2 className="text-2xl font-bold mb-6 text-red-500">Add New Meal Plan</h2>
+        <form onSubmit={handleMealPlanSubmit} className="space-y-4">
+          <input
+            type="text"
+            placeholder="Plan Name * (e.g. Muscle Gain Plan)"
+            value={mealPlanForm.name}
+            onChange={(e) => setMealPlanForm({ ...mealPlanForm, name: e.target.value })}
+            className="w-full p-3 bg-gray-800 border border-gray-700 rounded"
+            required
+          />
+          <input
+            type="number"
+            placeholder="Daily Calories Target *"
+            value={mealPlanForm.calories}
+            onChange={(e) => setMealPlanForm({ ...mealPlanForm, calories: e.target.value })}
+            className="w-full p-3 bg-gray-800 border border-gray-700 rounded"
+            required
+          />
+          <input
+            type="number"
+            placeholder="Daily Protein Target (g) *"
+            value={mealPlanForm.protein}
+            onChange={(e) => setMealPlanForm({ ...mealPlanForm, protein: e.target.value })}
+            className="w-full p-3 bg-gray-800 border border-gray-700 rounded"
+            required
+          />
+          <textarea
+            placeholder="Description * (e.g. High protein, moderate carbs for muscle building)"
+            value={mealPlanForm.description}
+            onChange={(e) => setMealPlanForm({ ...mealPlanForm, description: e.target.value })}
+            className="w-full p-3 bg-gray-800 border border-gray-700 rounded h-32"
+            required
+          />
+          <input
+            type="text"
+            placeholder="Duration (e.g. 4 weeks, 6 weeks, Ongoing)"
+            value={mealPlanForm.duration}
+            onChange={(e) => setMealPlanForm({ ...mealPlanForm, duration: e.target.value })}
+            className="w-full p-3 bg-gray-800 border border-gray-700 rounded"
+          />
+          <button type="submit" className="w-full bg-red-600 py-3 rounded font-bold hover:bg-red-700">
+            Add Meal Plan
           </button>
         </form>
       </section>

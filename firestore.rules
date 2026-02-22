@@ -1,0 +1,54 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ────────────────────────────────────────────────
+    // 1. Publicly readable collections (anyone can read)
+    // ────────────────────────────────────────────────
+    match /workouts/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;  // signed-in users can create/update
+    }
+
+    match /classes/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // ────────────────────────────────────────────────
+    // 2. Meal Plans – read by everyone, write only by admins
+    // ────────────────────────────────────────────────
+    match /mealPlans/{document=**} {
+      allow read: if true;  // anyone can see the plans (for Nutrition screen)
+
+      allow create, update, delete: if 
+        request.auth != null 
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
+        );
+    }
+
+    // ────────────────────────────────────────────────
+    // 3. User-owned data + all subcollections
+    // ────────────────────────────────────────────────
+    match /users/{userId} {
+      // Owner can read/write their own profile
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Owner can read/write ANY subcollection under their user
+      match /{subDoc=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // ────────────────────────────────────────────────
+    // 4. Default deny – MUST be last
+    // ────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
