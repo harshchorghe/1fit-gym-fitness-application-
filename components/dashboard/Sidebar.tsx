@@ -1,6 +1,10 @@
+// Sidebar.tsx
 'use client';
 
+import { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { auth } from '@/lib/firebase';
+import { incrementDailyStreak, hasClaimedStreakToday } from '@/lib/firestore/users';
 
 interface SidebarProps {
   isSidebarOpen: boolean;
@@ -10,10 +14,12 @@ interface SidebarProps {
 export default function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const [streak, setStreak] = useState(12);           // ← fallback / initial
+  const [claiming, setClaiming] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
-  const user = {
-    streak: 12,
-  };
+  // You can load real streak here too (optional)
+  // useEffect(() => { ... fetch user streak ... }, []);
 
   const navigationItems = [
     { name: 'Overview', icon: '📊', path: '/home/overview' },
@@ -24,6 +30,30 @@ export default function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
     { name: 'Community', icon: '👥', path: '/home/community' },
     { name: 'Profile', icon: '👤', path: '/profile' }
   ];
+
+  const handleClaimStreak = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      setMessage("Please sign in first");
+      return;
+    }
+
+    setClaiming(true);
+    try {
+      const newStreak = await incrementDailyStreak(user.uid);
+      if (newStreak === null) {
+        setMessage("You've already claimed your streak today!");
+      } else {
+        setStreak(newStreak);
+        setMessage(`Streak updated! Current: ${newStreak} 🔥`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setMessage("Failed to update streak");
+    } finally {
+      setClaiming(false);
+    }
+  };
 
   const handleNavigation = (path: string) => {
     router.push(path);
@@ -49,19 +79,42 @@ export default function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
         ))}
       </nav>
 
-      {/* Quick Stats in Sidebar */}
-      <div className="p-4 mt-4 border-t border-gray-800">
+      {/* Daily Streak Claim Button */}
+      <div className="p-4 border-t border-gray-800">
+        <button
+          onClick={handleClaimStreak}
+          disabled={claiming}
+          className={`w-full flex items-center justify-center space-x-3 px-4 py-3 rounded-lg font-semibold transition-all mb-4 ${
+            claiming 
+              ? 'bg-gray-700 cursor-not-allowed' 
+              : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white'
+          }`}
+        >
+          <span className="text-xl">🔥 Claim Daily Streak</span>
+        </button>
+
+        {message && (
+          <div className="text-center text-sm mb-3 px-2 py-1.5 bg-gray-800/80 rounded border border-gray-700">
+            {message}
+          </div>
+        )}
+      </div>
+
+      {/* Current Streak Display */}
+      <div className="p-4 border-t border-gray-800">
         <div className="bg-gradient-to-br from-red-500/20 to-black border border-red-500/30 p-4 rounded-lg">
           <div className="flex items-center space-x-2 mb-2">
             <span className="text-2xl">🔥</span>
             <div>
               <div className="text-xs text-gray-400">Current Streak</div>
               <div className="text-xl font-bold text-red-500" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                {user.streak} Days
+                {streak} Days
               </div>
             </div>
           </div>
-          <div className="text-xs text-gray-400 mt-2">Keep it going! 3 more days to unlock the 15-day badge.</div>
+          <div className="text-xs text-gray-400 mt-2">
+            Keep it going! {streak >= 12 ? 'Amazing!' : `Only ${15 - streak} more to unlock 15-day badge.`}
+          </div>
         </div>
       </div>
     </aside>

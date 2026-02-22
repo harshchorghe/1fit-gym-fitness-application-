@@ -1,4 +1,3 @@
-// lib/firestore/users.ts
 import { db } from "../firebase";
 import {
   doc,
@@ -7,6 +6,13 @@ import {
   updateDoc,
   serverTimestamp,
   Timestamp,
+  increment,
+  runTransaction,
+  collection,
+  limit,
+  orderBy,
+  query,
+  getDocs,
 } from "firebase/firestore";
 
 export interface UserData {
@@ -14,36 +20,38 @@ export interface UserData {
   firstName: string;
   lastName: string;
   email: string;
-  phone?: string;                // optional
+  phone?: string;
   membershipType: string;
   role?: 'user' | 'admin' | 'trainer';
-  photoURL?: string;             // profile picture URL (optional)
-  createdAt: Timestamp;          // server-generated
-  lastLogin?: Timestamp;         // optional
-  // Legacy field support (you can remove later)
+  photoURL?: string;
+  createdAt: Timestamp;
+  lastLogin?: Timestamp;
+  // Legacy
   isAdmin?: boolean;
+  // Streak fields
+  streak?: number;                  // default 0
+  lastStreakIncrement?: Timestamp;  // used to prevent multiple claims per day
 }
 
 /**
  * Creates or overwrites a user document in Firestore
- * @param uid - Firebase Auth UID
- * @param userData - User data without uid/createdAt
- * @returns true on success
  */
 export const createUserInFirestore = async (
   uid: string,
-  userData: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'isAdmin'> & {
+  userData: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'isAdmin' | 'streak' | 'lastStreakIncrement'> & {
     role?: UserData['role'];
-    isAdmin?: boolean; // legacy support
+    isAdmin?: boolean;
   }
 ): Promise<boolean> => {
   try {
     const fullData: UserData = {
       ...userData,
       uid,
-      createdAt: serverTimestamp() as any, // TypeScript needs 'any' for serverTimestamp
+      createdAt: serverTimestamp() as any,
       role: userData.role ?? 'user',
-      isAdmin: userData.isAdmin ?? false, // legacy
+      isAdmin: userData.isAdmin ?? false,
+      streak: 0,
+      lastStreakIncrement: null as any,
     };
 
     await setDoc(doc(db, "users", uid), fullData);
@@ -57,8 +65,6 @@ export const createUserInFirestore = async (
 
 /**
  * Fetches user data from Firestore
- * @param uid - User ID
- * @returns UserData or null if not found
  */
 export const getUserData = async (uid: string): Promise<UserData | null> => {
   try {
@@ -78,9 +84,7 @@ export const getUserData = async (uid: string): Promise<UserData | null> => {
 };
 
 /**
- * Updates specific fields in the user document (safe merge)
- * @param uid - User ID
- * @param updatedData - Fields to update
+ * Safe merge update of user fields
  */
 export const updateUserData = async (
   uid: string,
@@ -88,11 +92,8 @@ export const updateUserData = async (
 ): Promise<void> => {
   try {
     const userRef = doc(db, "users", uid);
-
-    // Use setDoc with merge instead of updateDoc to be safer
     await setDoc(userRef, updatedData, { merge: true });
-
-    console.log(`User document updated successfully: ${uid}`);
+    console.log(`User document updated: ${uid}`);
   } catch (error: any) {
     console.error("Failed to update user data:", error);
     throw new Error(`Could not update profile: ${error.message}`);
@@ -100,10 +101,7 @@ export const updateUserData = async (
 };
 
 /**
- * Checks if user has admin privileges
- * Supports both legacy `isAdmin` boolean and new `role` field
- * @param uid - User ID
- * @returns boolean - true if admin
+ * Checks admin privileges (legacy + new role field)
  */
 export const isUserAdmin = async (uid: string): Promise<boolean> => {
   try {
@@ -111,8 +109,6 @@ export const isUserAdmin = async (uid: string): Promise<boolean> => {
     if (!snapshot.exists()) return false;
 
     const data = snapshot.data() as Partial<UserData>;
-
-    // Check both legacy field and new role field
     return data.isAdmin === true || data.role === 'admin';
   } catch (err: any) {
     console.error("Admin check failed:", err);
@@ -121,8 +117,7 @@ export const isUserAdmin = async (uid: string): Promise<boolean> => {
 };
 
 /**
- * Updates last login timestamp (call after successful sign-in)
- * @param uid - User ID
+ * Updates last login timestamp
  */
 export const updateLastLogin = async (uid: string): Promise<void> => {
   try {
@@ -131,6 +126,172 @@ export const updateLastLogin = async (uid: string): Promise<void> => {
     });
   } catch (err: any) {
     console.warn("Could not update last login:", err);
-    // Non-critical, so don't throw
   }
 };
+
+/**
+ * Checks if user already claimed streak today
+ */
+export async function hasClaimedStreakToday(uid: string): Promise<boolean> {
+  const userRef = doc(db, "users", uid);
+  const snap = await getDoc(userRef);
+
+  if (!snap.exists()) return false;
+
+  const data = snap.data() as Partial<UserData>;
+  const last = data.lastStreakIncrement as Timestamp | undefined;
+
+  if (!last) return false;
+
+  const lastDate = last.toDate().toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
+
+  return lastDate === today;
+}
+
+/**
+ * Atomically increments streak by 1 — only once per day
+ * Uses transaction for safety
+ */
+export async function incrementDailyStreak(uid: string): Promise<number | null> {
+  const userRef = doc(db, "users", uid);
+
+  return await runTransaction(db, async (transaction) => {
+    const userSnap = await transaction.get(userRef);
+
+    if (!userSnap.exists()) {
+      throw new Error("User document does not exist");
+    }
+
+    const data = userSnap.data() as UserData;
+    const lastIncrement = data.lastStreakIncrement as Timestamp | undefined;
+
+    let alreadyClaimed = false;
+
+    if (lastIncrement) {
+      const lastDate = lastIncrement.toDate().toISOString().split('T')[0];
+      const today = new Date().toISOString().split('T')[0];
+      alreadyClaimed = lastDate === today;
+    }
+
+    if (alreadyClaimed) {
+      return null;
+    }
+
+    transaction.update(userRef, {
+      streak: increment(1),
+      lastStreakIncrement: serverTimestamp(),
+    });
+
+    return (data.streak ?? 0) + 1;
+  });
+}
+
+/* ────────────────────────────────────────────────
+   LEADERBOARD FUNCTIONS
+───────────────────────────────────────────────── */
+
+/**
+ * Recommended function for now:
+ * Fetches many users WITHOUT orderBy → gets users even with streak=0 or missing field
+ * Sorts client-side
+ */
+export async function getAllUsersForLeaderboard(maxUsers: number = 200): Promise<Array<{
+  uid: string;
+  name: string;
+  streak: number;
+  photoURL?: string;
+  rank: number;
+}>> {
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, limit(maxUsers));
+
+    const snap = await getDocs(q);
+
+    console.log(`[Leaderboard] Fetched ${snap.size} users (without ordering)`);
+
+    const users = snap.docs.map((docSnap) => {
+      const data = docSnap.data() as Partial<UserData>;
+
+      const name = [data.firstName || '', data.lastName || '']
+        .filter(Boolean)
+        .join(' ')
+        .trim() || 'User';
+
+      return {
+        uid: docSnap.id,
+        name,
+        streak: data.streak != null ? Number(data.streak) : 0,
+        photoURL: data.photoURL,
+      };
+    });
+
+    // Sort: highest streak first, then alphabetically by name
+    users.sort((a, b) => {
+      if (b.streak !== a.streak) return b.streak - a.streak;
+      return a.name.localeCompare(b.name);
+    });
+
+    // Assign ranks
+    return users.map((user, index) => ({
+      ...user,
+      rank: index + 1,
+    }));
+  } catch (error: any) {
+    console.error("getAllUsersForLeaderboard failed:", error);
+    return [];
+  }
+}
+
+/**
+ * Original server-side ordered version (requires index + streak field on all docs)
+ * Keep this for later when you want efficient large-scale ordering
+ */
+export async function getLeaderboardByStreak(limitCount: number = 20): Promise<Array<{
+  uid: string;
+  name: string;
+  streak: number;
+  photoURL?: string;
+}>> {
+  try {
+    const q = query(
+      collection(db, "users"),
+      orderBy("streak", "desc"),
+      limit(limitCount)
+    );
+
+    const snap = await getDocs(q);
+
+    if (snap.empty) {
+      console.warn("No users returned by ordered query → check index & streak field");
+    }
+
+    return snap.docs.map((doc) => {
+      const data = doc.data() as UserData;
+      return {
+        uid: doc.id,
+        name: [data.firstName || '', data.lastName || ''].join(' ').trim() || 'Anonymous',
+        streak: data.streak ?? 0,
+        photoURL: data.photoURL,
+      };
+    });
+  } catch (error: any) {
+    console.error("getLeaderboardByStreak failed:", error.code, error.message);
+    return [];
+  }
+}
+
+// ────────────────────────────────────────────────
+// Deprecated / older versions (you can remove later)
+// ────────────────────────────────────────────────
+
+export async function getTopUsersByStreak(topN: number = 20) {
+  console.warn("Using deprecated getTopUsersByStreak → switch to getAllUsersForLeaderboard");
+  return getLeaderboardByStreak(topN);
+}
+
+export async function getTopUsersByStreakWithLimit(limitVal: number = 1000) {
+  console.warn("Using deprecated getTopUsersByStreakWithLimit → switch to getAllUsersForLeaderboard");
+  return getLeaderboardByStreak(limitVal);
+}
