@@ -19,11 +19,52 @@ export default function GymLandingPage() {
     router.push('/signup');
   };
 
+  const goToSignin = () => {
+    router.push('/signin');
+  };
+
   const features = [
-    { icon: '💪', title: 'Strength Training', desc: 'Build raw power with state-of-the-art equipment' },
-    { icon: '🏃', title: 'Cardio Zone', desc: 'Premium cardio machines with virtual training' },
-    { icon: '🥊', title: 'Fight Club', desc: 'Boxing, MMA, and martial arts classes' },
-    { icon: '🧘', title: 'Recovery Studio', desc: 'Yoga, stretching, and meditation spaces' }
+    {
+      title: 'Strength Training',
+      desc: 'Build raw power with state-of-the-art equipment',
+      icon: (
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 13h2v6H3zM19 13h2v6h-2z" fill="#ef4444" />
+          <path d="M7 9h10v4H7z" fill="#fff" opacity="0.06" />
+          <path d="M9 3h6v6H9z" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    },
+    {
+      title: 'Cardio Zone',
+      desc: 'Premium cardio machines with virtual training',
+      icon: (
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="9" stroke="#ef4444" strokeWidth="1.5" />
+          <path d="M8 12h8" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      )
+    },
+    {
+      title: 'Fight Club',
+      desc: 'Boxing, MMA, and martial arts classes',
+      icon: (
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="6" width="16" height="12" rx="2" stroke="#ef4444" strokeWidth="1.5" />
+          <path d="M8 10h8" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+      )
+    },
+    {
+      title: 'Recovery Studio',
+      desc: 'Yoga, stretching, and meditation spaces',
+      icon: (
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 3c2.7 0 5 2.3 5 5s-2.3 5-5 5-5-2.3-5-5 2.3-5 5-5z" stroke="#ef4444" strokeWidth="1.2" />
+          <path d="M6 21c2-3 4-4 6-4s4 1 6 4" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />
+        </svg>
+      )
+    }
   ];
 
   const plans = [
@@ -150,12 +191,20 @@ export default function GymLandingPage() {
               ))}
             </div>
 
-            <button 
-              onClick={goToSignup}
-              className="hidden md:block bg-red-500 hover:bg-red-600 px-6 py-3 rounded-none font-semibold transition-all transform hover:scale-105"
-            >
-              JOIN NOW
-            </button>
+            <div className="hidden md:flex items-center space-x-3">
+              <button
+                onClick={goToSignin}
+                className="text-gray-300 hover:text-white px-4 py-2 border border-transparent hover:border-gray-700 transition-colors font-medium"
+              >
+                SIGN IN
+              </button>
+              <button
+                onClick={goToSignup}
+                className="bg-red-500 hover:bg-red-600 px-6 py-3 rounded-none font-semibold transition-all transform hover:scale-105"
+              >
+                SIGN UP
+              </button>
+            </div>
 
             {/* Mobile Menu Button */}
             <button 
@@ -187,15 +236,26 @@ export default function GymLandingPage() {
                   {item}
                 </a>
               ))}
-              <button 
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  goToSignup();
-                }}
-                className="w-full bg-red-500 hover:bg-red-600 px-6 py-3 rounded-none font-semibold transition-all"
-              >
-                JOIN NOW
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    goToSignin();
+                  }}
+                  className="w-full bg-transparent hover:bg-gray-900 text-white border border-gray-700 px-6 py-3 font-medium transition-all"
+                >
+                  SIGN IN
+                </button>
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    goToSignup();
+                  }}
+                  className="w-full bg-red-500 hover:bg-red-600 px-6 py-3 rounded-none font-semibold transition-all"
+                >
+                  SIGN UP
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -209,28 +269,30 @@ export default function GymLandingPage() {
           <div className="absolute bottom-20 left-10 w-80 h-80 bg-red-500/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }}></div>
         </div>
 
-        <div className="relative z-10 mt-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div className="relative z-10 mt-20 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 
-            className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold mb-6 animate-slide-in"
-            style={{ fontFamily: 'Oswald, sans-serif', lineHeight: '0.9' }}
+            className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold leading-tight mb-6 animate-slide-in"
+            style={{ fontFamily: 'Oswald, sans-serif' }}
           >
-            <div className="text-white">FORGE</div>
-            <div className="text-stroke">YOUR</div>
-            <div className="text-white">LEGEND</div>
+            <span className="block text-white">FORGE</span>
+            <span className="block text-red-500">YOUR LEGEND</span>
           </h1>
-          
-          <p className="text-lg sm:text-xl md:text-2xl text-gray-400 mb-12 max-w-3xl mx-auto animate-slide-in stagger-1">
-            Transform your body, elevate your mind, and unleash your true potential in the ultimate fitness sanctuary.
+
+          <p className="text-md sm:text-lg md:text-xl text-gray-300 mb-10 max-w-3xl mx-auto animate-slide-in stagger-1">
+            Transform your body, elevate your mind, and unleash your true potential in our premium training environment.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-in stagger-2">
             <button 
               onClick={goToSignup}
-              className="bg-red-500 hover:bg-red-600 px-8 py-4 text-lg font-bold rounded-none transition-all transform hover:scale-105 hover:shadow-lg hover:shadow-red-500/50"
+              className="inline-flex items-center justify-center bg-gradient-to-r from-red-600 to-red-500 px-8 py-4 text-lg font-semibold rounded-md shadow-lg transition-transform transform hover:scale-105"
             >
-              START YOUR JOURNEY
+              GET STARTED
             </button>
-            <button className="border-2 border-white hover:bg-white hover:text-black px-8 py-4 text-lg font-bold rounded-none transition-all transform hover:scale-105">
+            <button 
+              onClick={() => window.scrollTo({ top: document.getElementById('features')?.offsetTop || 0, behavior: 'smooth' })}
+              className="inline-flex items-center justify-center border-2 border-gray-700 text-gray-200 px-6 py-3 text-lg font-medium rounded-md hover:bg-gray-800 transition-colors"
+            >
               WATCH TOUR
             </button>
           </div>
@@ -270,19 +332,57 @@ export default function GymLandingPage() {
             {features.map((feature, i) => (
               <div 
                 key={i}
-                className="bg-gradient-to-b from-gray-900 to-black border border-gray-800 p-8 hover:border-red-500 transition-all group hover:transform hover:scale-105 animate-scale-in"
+                className="bg-gradient-to-b from-gray-900 to-black border border-gray-800 p-6 hover:border-red-500 transition-all group hover:transform hover:scale-102 animate-scale-in"
                 style={{ animationDelay: `${i * 0.1}s` }}
               >
-                <div className="text-5xl md:text-6xl mb-6 transform group-hover:scale-110 transition-transform">{feature.icon}</div>
-                <h3 className="text-xl md:text-2xl font-bold mb-3 group-hover:text-red-500 transition-colors" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                  {feature.title}
-                </h3>
-                <p className="text-gray-400 text-sm md:text-base">{feature.desc}</p>
+                <div className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">{feature.icon}</div>
+                  <div>
+                    <h3 className="text-lg md:text-xl font-semibold mb-2 text-white" style={{ fontFamily: 'Oswald, sans-serif' }}>
+                      {feature.title}
+                    </h3>
+                    <p className="text-gray-400 text-sm md:text-base">{feature.desc}</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
+
+      {/* Testimonials */}
+      <section id="testimonials" className="py-16 md:py-20 bg-gradient-to-b from-black/80 to-black/95">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: 'Oswald, sans-serif' }}>What Our Members Say</h2>
+          <p className="text-gray-400 mb-8 max-w-2xl mx-auto">Results-driven training, supportive coaches, and an environment that keeps you coming back.</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              { quote: 'Transformed my strength and confidence in 3 months.', name: 'Amit R.', role: 'Software Engineer' },
+              { quote: 'Coaches pushed me safely to new PRs — incredible!', name: 'Priya S.', role: 'Athlete' },
+              { quote: 'Clean facility, strong community, excellent programming.', name: 'Rahul K.', role: 'Designer' }
+            ].map((t, i) => (
+              <div key={i} className="bg-gradient-to-b from-gray-900 to-black border border-gray-800 p-6 rounded-lg shadow-sm">
+                <div className="text-yellow-400 mb-3">★★★★★</div>
+                <p className="text-gray-200 mb-4">“{t.quote}”</p>
+                <div className="text-sm text-gray-400">{t.name} — {t.role}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Trust / Logos (small) */}
+      <div className="py-6 bg-black border-t border-gray-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center space-x-8">
+          <div className="text-gray-500 text-sm">Trusted by</div>
+          <div className="flex items-center space-x-6 opacity-75">
+            <div className="text-gray-400 font-semibold">GymPro</div>
+            <div className="text-gray-400 font-semibold">FitLabs</div>
+            <div className="text-gray-400 font-semibold">WellnessCo</div>
+          </div>
+        </div>
+      </div>
 
       {/* CTA Banner */}
       <section className="py-16 md:py-24 bg-gradient-to-r from-red-600 to-red-500 relative overflow-hidden">
@@ -319,7 +419,7 @@ export default function GymLandingPage() {
             {plans.map((plan, i) => (
               <div 
                 key={i}
-                className={`relative border ${plan.popular ? 'border-red-500 scale-105 md:scale-110' : 'border-gray-800'} p-8 hover:border-red-500 transition-all bg-gradient-to-b from-gray-900 to-black animate-scale-in`}
+                className={`relative border ${plan.popular ? 'border-red-500 scale-105 md:scale-110' : 'border-gray-800'} p-6 hover:border-red-500 transition-all bg-gradient-to-b from-gray-900 to-black shadow-md rounded-md animate-scale-in`}
                 style={{ animationDelay: `${i * 0.15}s` }}
               >
                 {plan.popular && (
@@ -332,8 +432,8 @@ export default function GymLandingPage() {
                   {plan.name}
                 </h3>
                 
-                <div className="mb-6">
-                  <span className="text-5xl md:text-6xl font-bold text-red-500">${plan.price}</span>
+                <div className="mb-6 flex items-baseline space-x-3">
+                  <span className="text-4xl md:text-5xl font-extrabold text-red-500">₹{plan.price}</span>
                   <span className="text-gray-500">/month</span>
                 </div>
 
@@ -348,7 +448,7 @@ export default function GymLandingPage() {
 
                 <button 
                   onClick={goToSignup}
-                  className={`w-full py-4 font-bold transition-all ${plan.popular ? 'bg-red-500 hover:bg-red-600' : 'bg-transparent border-2 border-gray-700 hover:border-red-500 hover:bg-red-500'}`}
+                  className={`w-full py-3 font-semibold transition-all rounded-md ${plan.popular ? 'bg-red-500 hover:bg-red-600 shadow-lg' : 'bg-transparent border-2 border-gray-700 hover:border-red-500 hover:bg-red-500'}`}
                 >
                   SELECT PLAN
                 </button>
@@ -451,7 +551,7 @@ export default function GymLandingPage() {
 
           <div className="border-t border-gray-900 pt-8 flex flex-col sm:flex-row justify-between items-center">
             <p className="text-gray-500 text-sm mb-4 sm:mb-0">
-              © 2026 1FIT Fitness. All rights reserved.
+              © 2026 1FIT Fitness. All rights reserved by Harsh Chorghe.
             </p>
             <div className="flex space-x-6">
               {['Facebook', 'Instagram', 'Twitter', 'YouTube'].map((social) => (
