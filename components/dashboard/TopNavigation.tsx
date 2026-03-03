@@ -17,11 +17,11 @@ export default function TopNavigation({ onMenuClick }: TopNavigationProps) {
   const [userInfo, setUserInfo] = useState<{
     name: string;
     membershipType: string;
-    image: string;
+    image?: string;
   }>({
     name: 'Guest',
     membershipType: '',
-    image: '👤',
+    image: undefined,
   });
 
   const [loading, setLoading] = useState(true);
@@ -33,7 +33,7 @@ export default function TopNavigation({ onMenuClick }: TopNavigationProps) {
         setUserInfo({
           name: 'Guest',
           membershipType: '',
-          image: '👤',
+          image: undefined,
         });
         // Optional: router.push('/signin');
         setLoading(false);
@@ -59,14 +59,14 @@ export default function TopNavigation({ onMenuClick }: TopNavigationProps) {
         setUserInfo({
           name,
           membershipType: membership,
-          image: firebaseUser.photoURL || '👤',  // will show photo if uploaded later
+          image: firebaseUser.photoURL || undefined, // will show default icon if not provided
         });
       } catch (err) {
         console.error('Error fetching user info for nav:', err);
         setUserInfo({
           name: firebaseUser.displayName || 'User',
           membershipType: 'Starter',
-          image: '👤',
+          image: undefined,
         });
       } finally {
         setLoading(false);
@@ -118,7 +118,16 @@ export default function TopNavigation({ onMenuClick }: TopNavigationProps) {
               className="flex items-center space-x-3 p-2 hover:bg-gray-900 rounded-lg transition-colors cursor-pointer"
               onClick={() => router.push('/profile')}
             >
-              <div className="text-3xl">{userInfo.image}</div>
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center">
+                {userInfo.image ? (
+                  <img src={userInfo.image} alt="avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-gray-300">
+                    <path d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5z" stroke="currentColor" strokeWidth="2" />
+                    <path d="M4 22c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                )}
+              </div>
               <div className="hidden sm:block text-left">
                 {loading ? (
                   <div className="text-sm text-gray-400">Loading...</div>
