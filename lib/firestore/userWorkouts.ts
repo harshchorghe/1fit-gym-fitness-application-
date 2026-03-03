@@ -6,6 +6,8 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  deleteDoc,
+  doc,
 } from "firebase/firestore";
 import type { Workout } from "./Workouts";   // reuse your Workout interface
 
@@ -50,4 +52,12 @@ export const getCompletedWorkouts = async (
     id: doc.id,
     ...doc.data(),
   })) as CompletedWorkout[];
+};
+
+// remove a completed workout entry for the user
+export const deleteCompletedWorkout = async (
+  userId: string,
+  entryId: string
+) => {
+  await deleteDoc(doc(db, `users/${userId}/completedWorkouts`, entryId));
 };

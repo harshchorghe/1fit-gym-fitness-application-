@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { getWorkouts, Workout, addWorkout } from '@/lib/firestore/Workouts';
+import { deleteCompletedWorkout } from '@/lib/firestore/userWorkouts';
 import { auth, db } from '@/lib/firebase';
 import {
   collection,
@@ -51,7 +52,7 @@ function CategoryDetailView({ category }: { category: Category }) {
   );
 }
 
-function WorkoutDetailView({ workout, onClose }: { workout: DetailedWorkout; onClose?: () => void }) {
+function WorkoutDetailView({ workout, onClose }: { workout: Workout; onClose?: () => void }) {
   const [started, setStarted] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
@@ -114,22 +115,17 @@ function WorkoutDetailView({ workout, onClose }: { workout: DetailedWorkout; onC
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6 text-center">
           <div className="text-4xl mb-2">🎉</div>
           <h3 className="font-bold text-green-400 text-lg">Workout Started!</h3>
-          <p className="text-gray-400 text-sm mt-1">Your {workout.name} session is now active. Let's go!</p>
+          <p className="text-gray-400 text-sm mt-1">Your {workout.title} session is now active. Let's go!</p>
         </div>
       )}
     </div>
   );
 }
 
-function MyWorkoutDetailView({ workout, onClose }: { workout: MyWorkout; onClose?: () => void }) {
+function MyWorkoutDetailView({ workout, onClose }: { workout: CompletedWorkout; onClose?: () => void }) {
   const [isStarting, setIsStarting] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
 
-  const exercises = Array.from({ length: workout.exercises }, (_, i) => ({
-    name: `Exercise ${i + 1}`,
-    sets: 3,
-    reps: i % 3 === 0 ? 10 : i % 3 === 1 ? 12 : 8,
-  }));
 
   const handleStartWorkout = () => {
     setIsStarting(true);
@@ -391,6 +387,18 @@ export default function WorkoutsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [startStatus, setStartStatus] = useState<Record<string, 'idle' | 'loading' | 'done'>>({});
 
+  // remove a completed workout both locally and in Firestore
+  const handleRemoveMyWorkout = async (entryId: string) => {
+    if (!user?.uid) return;
+
+    try {
+      await deleteCompletedWorkout(user.uid, entryId);
+      setMyCompletedWorkouts(prev => prev.filter(e => e.id !== entryId));
+    } catch (err) {
+      console.error('failed to delete completed workout', err);
+    }
+  };
+
   const openModal = (type: ModalType, payload?: any) => setModal({ type, payload });
   const closeModal = () => setModal(null);
 
@@ -635,8 +643,21 @@ export default function WorkoutsScreen() {
               <div
                 key={entry.id}
                 onClick={() => openModal('myWorkout', entry)}
-                className="bg-black/60 border border-gray-800 p-6 rounded-xl hover:border-red-600/70 transition-all cursor-pointer group"
+                className="relative bg-black/60 border border-gray-800 p-6 rounded-xl hover:border-red-600/70 transition-all cursor-pointer group"
               >
+                {/* delete icon */}
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveMyWorkout(entry.id);
+                    }}
+                    className="text-gray-400 hover:text-red-500 text-xl leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+
                 <h3 className="text-xl font-bold mb-3 group-hover:text-red-400 transition-colors">
                   {entry.title}
                 </h3>
