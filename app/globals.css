@@ -2,28 +2,209 @@
 @tailwind components;
 @tailwind utilities;
 
-/* You can keep your custom variables here if you want dark/light mode */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0f141b;
+  --foreground: #e6ebf2;
+  --surface: #141a22;
+  --surface-elevated: #1a2230;
+  --border-soft: #273244;
+  --text-muted: #96a2b5;
+  --accent: #ff6b6b;
+  --accent-hover: #ff7f7f;
+  --success: #3cd6a8;
+  --info: #69a6ff;
+  --focus-ring: rgba(255, 107, 107, 0.35);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f141b;
+    --foreground: #e6ebf2;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  letter-spacing: 0.01em;
 }
 
-/* Optional: reset or base styles you like */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    letter-spacing: 0.01em;
+  }
+
+  [style*='Oswald'] {
+    font-family: var(--font-geist-sans), Inter, system-ui, sans-serif !important;
+    letter-spacing: 0.02em;
+  }
+
+  input,
+  select,
+  textarea {
+    background: color-mix(in oklab, var(--surface-elevated) 88%, black);
+    border-color: var(--border-soft);
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus,
+  button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--focus-ring);
+  }
+}
+
+@layer components {
+  .grain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0.02;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.3' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
+}
+
+@layer utilities {
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes buttonPop {
+    0% {
+      transform: scale(1);
+    }
+    40% {
+      transform: scale(0.97);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-120%);
+    }
+    100% {
+      transform: translateX(120%);
+    }
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.45s ease-out forwards;
+  }
+
+  .stagger-1 {
+    animation-delay: 0.08s;
+  }
+
+  .stagger-2 {
+    animation-delay: 0.16s;
+  }
+
+  .stagger-3 {
+    animation-delay: 0.24s;
+  }
+
+  .animate-button-pop {
+    animation: buttonPop 0.28s ease;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 0.9s ease-in-out infinite;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .text-gray-400 {
+    color: var(--text-muted) !important;
+  }
+
+  .text-gray-500,
+  .text-gray-600 {
+    color: color-mix(in oklab, var(--text-muted) 82%, #2f3e55) !important;
+  }
+
+  .bg-black,
+  .bg-black\/90,
+  .bg-black\/95 {
+    background-color: var(--background) !important;
+  }
+
+  .bg-gray-900,
+  .bg-gray-900\/50,
+  .bg-gray-900\/80 {
+    background-color: color-mix(in oklab, var(--surface) 92%, black) !important;
+  }
+
+  .bg-gray-800,
+  .bg-gray-800\/80 {
+    background-color: var(--surface-elevated) !important;
+  }
+
+  .from-gray-900,
+  .via-black,
+  .to-black,
+  .to-gray-900,
+  .from-gray-950 {
+    --tw-gradient-from: color-mix(in oklab, var(--surface) 95%, black) var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: color-mix(in oklab, var(--background) 98%, black) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+
+  .border-gray-700,
+  .border-gray-800,
+  .border-gray-900 {
+    border-color: var(--border-soft) !important;
+  }
+
+  .text-white {
+    color: var(--foreground) !important;
+  }
+
+  .text-red-500 {
+    color: var(--accent) !important;
+  }
+
+  .bg-red-500 {
+    background-color: var(--accent) !important;
+  }
+
+  .hover\:bg-red-600:hover,
+  .hover\:bg-red-500:hover {
+    background-color: var(--accent-hover) !important;
+  }
+
+  .hover\:border-red-500:hover,
+  .focus\:border-red-500:focus {
+    border-color: color-mix(in oklab, var(--accent) 70%, white) !important;
+  }
 }

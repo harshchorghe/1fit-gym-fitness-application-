@@ -51,7 +51,32 @@ function CategoryDetailView({ category }: { category: Category }) {
   );
 }
 
-function WorkoutDetailView({ workout }: { workout: Workout }) {
+function WorkoutDetailView({ workout, onClose }: { workout: DetailedWorkout; onClose?: () => void }) {
+  const [started, setStarted] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+
+  const exercises = [
+    { name: 'Warm Up', sets: '—', reps: '5 min', rest: '—' },
+    { name: 'Exercise A', sets: '4', reps: '10', rest: '60s' },
+    { name: 'Exercise B', sets: '3', reps: '12', rest: '45s' },
+    { name: 'Exercise C', sets: '3', reps: '8', rest: '60s' },
+    { name: 'Exercise D', sets: '4', reps: '15', rest: '30s' },
+    { name: 'Cool Down', sets: '—', reps: '5 min', rest: '—' },
+  ];
+
+  const difficultyColor =
+    workout.difficulty === 'Beginner' ? 'text-green-400 bg-green-500/20' :
+    workout.difficulty === 'Intermediate' ? 'text-yellow-400 bg-yellow-500/20' :
+    'text-red-400 bg-red-500/20';
+
+  const handleStartWorkout = () => {
+    setIsStarting(true);
+    setTimeout(() => {
+      setStarted(true);
+      setIsStarting(false);
+    }, 420);
+  };
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-center" style={{ fontFamily: 'Oswald, sans-serif' }}>
@@ -75,14 +100,45 @@ function WorkoutDetailView({ workout }: { workout: Workout }) {
           <div className="text-xl font-bold text-red-500">{workout.trainer || '—'}</div>
         </div>
       </div>
-      <button className="w-full bg-red-600 hover:bg-red-700 py-3 rounded-lg font-bold mt-6">
-        START WORKOUT
-      </button>
+
+      {/* Action */}
+      {!started ? (
+        <button
+          onClick={handleStartWorkout}
+          disabled={isStarting}
+          className={`w-full bg-red-500 hover:bg-red-600 py-3 rounded-lg font-bold transition-all ${isStarting ? 'animate-button-pop cursor-wait' : ''}`}
+        >
+          {isStarting ? '⏳ STARTING WORKOUT...' : '🏋️ START WORKOUT'}
+        </button>
+      ) : (
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6 text-center">
+          <div className="text-4xl mb-2">🎉</div>
+          <h3 className="font-bold text-green-400 text-lg">Workout Started!</h3>
+          <p className="text-gray-400 text-sm mt-1">Your {workout.name} session is now active. Let's go!</p>
+        </div>
+      )}
     </div>
   );
 }
 
-function MyWorkoutDetailView({ workout }: { workout: CompletedWorkout }) {
+function MyWorkoutDetailView({ workout, onClose }: { workout: MyWorkout; onClose?: () => void }) {
+  const [isStarting, setIsStarting] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
+
+  const exercises = Array.from({ length: workout.exercises }, (_, i) => ({
+    name: `Exercise ${i + 1}`,
+    sets: 3,
+    reps: i % 3 === 0 ? 10 : i % 3 === 1 ? 12 : 8,
+  }));
+
+  const handleStartWorkout = () => {
+    setIsStarting(true);
+    setTimeout(() => {
+      setHasStarted(true);
+      setIsStarting(false);
+    }, 420);
+  };
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">{workout.title}</h2>
@@ -101,12 +157,21 @@ function MyWorkoutDetailView({ workout }: { workout: CompletedWorkout }) {
           <div className="text-lg font-bold text-red-500">{workout.calories}</div>
         </div>
       </div>
-      <p className="text-sm text-gray-600 mt-4">
-        Completed: {workout.completedAt?.toDate?.()?.toLocaleString() || 'Just now'}
-      </p>
-      <button className="w-full bg-red-600 hover:bg-red-700 py-3 rounded-lg font-bold">
-        START AGAIN
-      </button>
+
+      {!hasStarted ? (
+        <button
+          onClick={handleStartWorkout}
+          disabled={isStarting}
+          className={`w-full bg-red-500 hover:bg-red-600 py-3 rounded-lg font-bold transition-all ${isStarting ? 'animate-button-pop cursor-wait' : ''}`}
+        >
+          {isStarting ? '⏳ STARTING WORKOUT...' : '🏋️ START WORKOUT'}
+        </button>
+      ) : (
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-center">
+          <div className="font-semibold text-green-400">Workout is active</div>
+          <div className="text-sm text-gray-400 mt-1">Timer and tracking are now running for this plan.</div>
+        </div>
+      )}
     </div>
   );
 }

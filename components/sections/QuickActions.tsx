@@ -27,6 +27,7 @@ interface GymSession {
 export default function QuickActions() {
   const [sessions, setSessions] = useState<GymSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [isStartingSession, setIsStartingSession] = useState(false);
   const [showPreGymForm, setShowPreGymForm] = useState(false);
   const [showPostGymForm, setShowPostGymForm] = useState(false);
   const [showProgressReport, setShowProgressReport] = useState(false);
@@ -49,7 +50,11 @@ export default function QuickActions() {
   });
 
   const handleStartSession = () => {
-    setShowPreGymForm(true);
+    setIsStartingSession(true);
+    setTimeout(() => {
+      setShowPreGymForm(true);
+      setIsStartingSession(false);
+    }, 420);
   };
 
   const handlePreGymSubmit = (e: React.FormEvent) => {
@@ -103,10 +108,16 @@ export default function QuickActions() {
           {!activeSessionId ? (
             <button
               onClick={handleStartSession}
-              className="w-full bg-red-500 hover:bg-red-600 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2"
+              disabled={isStartingSession}
+              className={`relative w-full bg-red-500 hover:bg-red-600 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2 overflow-hidden ${
+                isStartingSession ? 'animate-button-pop cursor-wait opacity-95' : ''
+              }`}
             >
+              {isStartingSession && (
+                <span className="absolute inset-0 bg-white/10 animate-shimmer" aria-hidden="true"></span>
+              )}
               <span className="text-xl">🔥</span>
-              <span>PRE WORKOUT</span>
+              <span>{isStartingSession ? 'STARTING SESSION...' : 'PRE WORKOUT'}</span>
             </button>
           ) : (
             <>
