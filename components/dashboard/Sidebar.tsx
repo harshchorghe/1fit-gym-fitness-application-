@@ -47,13 +47,46 @@ export default function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
   }, []);
 
   const navigationItems = [
-    { name: 'Overview', icon: '📊', path: '/home/overview' },
-    { name: 'Workouts', icon: '💪', path: '/home/workouts' },
-    { name: 'Classes', icon: '📅', path: '/home/classes' },
-    { name: 'Progress', icon: '📈', path: '/home/progress' },
-    { name: 'Nutrition', icon: '🥗', path: '/home/nutrition' },
-    { name: 'Community', icon: '👥', path: '/home/community' },
-    { name: 'Profile', icon: '👤', path: '/profile' }
+    { name: 'Overview', icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 13h4v-4H3v4zm6 6h4v-10h-4v10zm6 4h4v-16h-4v16z" fill="currentColor" />
+        </svg>
+      ), path: '/home/overview' },
+    { name: 'Workouts', icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M5 4h2v16H5V4zm12 0h2v16h-2V4z" fill="currentColor" />
+          <rect x="9" y="8" width="6" height="8" rx="1" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      ), path: '/home/workouts' },
+    { name: 'Classes', icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
+          <path d="M3 10h18" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      ), path: '/home/classes' },
+    { name: 'Progress', icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 14h4v6H4v-6zm6-4h4v10h-4V10zm6-6h4v16h-4V4z" fill="currentColor" />
+        </svg>
+      ), path: '/home/progress' },
+    { name: 'Nutrition', icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
+          <path d="M12 4v8l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      ), path: '/home/nutrition' },
+    { name: 'Community', icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M16 11c1.657 0 3-1.343 3-3S17.657 5 16 5s-3 1.343-3 3 1.343 3 3 3zM8 11c1.657 0 3-1.343 3-3S9.657 5 8 5 5 6.343 5 8s1.343 3 3 3z" stroke="currentColor" strokeWidth="2" />
+          <path d="M2 19c0-2.761 2.239-5 5-5h10c2.761 0 5 2.239 5 5v1H2v-1z" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      ), path: '/home/community' },
+    { name: 'Profile', icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2" />
+          <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      ), path: '/profile' }
   ];
 
   const handleClaimStreak = async () => {
@@ -121,7 +154,18 @@ export default function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
               : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white'
           }`}
         >
-          <span className="text-xl">{streakClaimed ? '✓' : '🔥'} {streakClaimed ? 'Claimed Today' : 'Claim Daily Streak'}</span>
+            <span className="text-xl flex items-center justify-center space-x-2">
+              {streakClaimed ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor" />
+                </svg>
+              )}
+              <span>{streakClaimed ? 'Claimed Today' : 'Claim Daily Streak'}</span>
+            </span>
         </button>
 
         {message && (
@@ -135,7 +179,9 @@ export default function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
       <div className="p-4 border-t border-gray-800">
         <div className="bg-gradient-to-br from-red-500/20 to-black border border-red-500/30 p-4 rounded-lg">
           <div className="flex items-center space-x-2 mb-2">
-            <span className="text-2xl">🔥</span>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-red-500">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor" />
+            </svg>
             <div>
               <div className="text-xs text-gray-400">Current Streak</div>
               <div className="text-xl font-bold text-red-500" style={{ fontFamily: 'Oswald, sans-serif' }}>
@@ -144,7 +190,7 @@ export default function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
             </div>
           </div>
           <div className="text-xs text-gray-400 mt-2">
-            Keep it going! {streak >= 15 ? '🎉 Amazing!' : `Only ${Math.max(0, 15 - streak)} more to unlock 15-day badge.`}
+            Keep it going! {streak >= 15 ? 'Amazing progress!' : `Only ${Math.max(0, 15 - streak)} more to unlock 15-day badge.`}
           </div>
         </div>
       </div>

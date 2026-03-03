@@ -18,6 +18,8 @@ export default function RootLayout({
       <body
         className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
       >
+        {/* Theme init script: sets .dark or .light on <html> before React hydrates */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{const t=localStorage.getItem('theme');const prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;const theme = t || (prefersDark ? 'dark' : 'light');document.documentElement.classList.remove('light','dark');document.documentElement.classList.add(theme);}catch(e){}})();` }} />
         {children}
       </body>
     </html>

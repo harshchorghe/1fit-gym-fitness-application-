@@ -1,6 +1,7 @@
-'use client';
+ 'use client';
 
 import { useState, useEffect } from 'react';
+import ThemeToggle from '@/components/ThemeToggle';
 import { useRouter } from 'next/navigation';   // Correct import for App Router
 
 export default function GymLandingPage() {
@@ -204,6 +205,9 @@ export default function GymLandingPage() {
               >
                 SIGN UP
               </button>
+              <div className="pl-2">
+                <ThemeToggle />
+              </div>
             </div>
 
             {/* Mobile Menu Button */}
@@ -255,6 +259,9 @@ export default function GymLandingPage() {
                 >
                   SIGN UP
                 </button>
+                <div className="flex justify-center pt-2">
+                  <ThemeToggle />
+                </div>
               </div>
             </div>
           </div>

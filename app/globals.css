@@ -3,6 +3,22 @@
 @tailwind utilities;
 
 :root {
+  /* Light theme defaults (refined for better contrast) */
+  --background: #f7fafc;
+  --foreground: #0b1220;
+  --surface: #ffffff;
+  --surface-elevated: #f3f6fa; /* slightly darker than background for elevated surfaces */
+  --border-soft: #e6eef8; /* soft subtle borders */
+  --text-muted: #4b5563; /* improved contrast for muted text */
+  --accent: #ef4444; /* brand red */
+  --accent-hover: #ff6b6b;
+  --success: #10b981;
+  --info: #3b82f6;
+  --focus-ring: rgba(239,68,68,0.12);
+}
+
+/* Dark theme overrides */
+.dark {
   --background: #0f141b;
   --foreground: #e6ebf2;
   --surface: #141a22;
@@ -16,8 +32,9 @@
   --focus-ring: rgba(255, 107, 107, 0.35);
 }
 
+/* Respect system preference if no explicit choice */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light):not(.dark) {
     --background: #0f141b;
     --foreground: #e6ebf2;
   }

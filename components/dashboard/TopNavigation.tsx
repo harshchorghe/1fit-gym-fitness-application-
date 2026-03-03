@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';  // Adjust path if needed (e.g. '@/lib/firebase')
+import ThemeToggle from '@/components/ThemeToggle';
 
 interface TopNavigationProps {
   onMenuClick: () => void;
@@ -101,6 +102,9 @@ export default function TopNavigation({ onMenuClick }: TopNavigationProps) {
 
           {/* Right Side */}
           <div className="flex items-center space-x-4">
+            <div className="hidden sm:block">
+              <ThemeToggle />
+            </div>
             {/* Notifications */}
             <button className="relative p-2 hover:bg-gray-900 rounded-lg transition-colors">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
