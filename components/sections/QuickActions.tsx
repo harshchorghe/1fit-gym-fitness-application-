@@ -31,6 +31,8 @@ export default function QuickActions() {
   const [showPreGymForm, setShowPreGymForm] = useState(false);
   const [showPostGymForm, setShowPostGymForm] = useState(false);
   const [showProgressReport, setShowProgressReport] = useState(false);
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
 
   const [preGymData, setPreGymData] = useState({
     weight: '',
@@ -96,6 +98,57 @@ export default function QuickActions() {
     setShowPostGymForm(true);
   };
 
+  const askAI = async () => {
+    setIsLoadingAI(true);
+    setAiResponse(null);
+
+    try {
+      let prompt = "Suggest a balanced 30-minute gym or home workout plan for general fitness.";
+
+      if (activeSession) {
+        const { beforeGym } = activeSession;
+        const energyText = beforeGym.energy ? `${beforeGym.energy}/10` : "unknown";
+        const moodText = beforeGym.mood || "not specified";
+        const notesText = beforeGym.notes ? `Notes/injuries: ${beforeGym.notes}` : "No additional notes.";
+
+        prompt = `
+Current pre-gym stats:
+- Weight: ${beforeGym.weight || "?"} kg
+- Resting HR: ${beforeGym.heartRate || "?"} BPM
+- Energy level: ${energyText}
+- Mood: ${moodText}
+- ${notesText}
+
+Please create a **30-minute workout plan** that fits my current state.
+- If energy low/tired → lighter intensity, more rest, bodyweight focus
+- If pumped/good mood → add intensity or compound lifts
+- Avoid aggravating any mentioned injuries
+- Include warm-up, main circuit/sets/reps/rest, cool-down stretches
+- Keep total time ~30 min
+`;
+      }
+
+      const res = await fetch("/api/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "AI request failed");
+      }
+
+      setAiResponse(data.text);
+    } catch (error: any) {
+      console.error("AI fetch error:", error);
+      setAiResponse(`Error getting suggestion: ${error.message || "Try again later."}`);
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
+
   const activeSession = sessions.find(s => s.id === activeSessionId);
 
   return (
@@ -149,8 +202,39 @@ export default function QuickActions() {
               )}
             </>
           )}
+
+          {/* AI Assistant Button */}
+          <button
+            onClick={askAI}
+            disabled={isLoadingAI}
+            className={`w-full bg-purple-500 hover:bg-purple-600 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2 ${
+              isLoadingAI ? 'opacity-75 cursor-not-allowed' : ''
+            }`}
+          >
+            <span className="text-xl">🤖</span>
+            <span>{isLoadingAI ? 'GETTING AI SUGGESTION...' : 'AI WORKOUT ASSISTANT'}</span>
+          </button>
         </div>
       </div>
+
+      {/* AI Response Display */}
+      {aiResponse && (
+        <div className="bg-gradient-to-br from-purple-900/20 to-blue-900/20 border border-purple-500/30 p-6 rounded-lg">
+          <h3 className="text-xl font-bold mb-4 text-purple-400 flex items-center space-x-2">
+            <span className="text-2xl">🤖</span>
+            <span>AI WORKOUT SUGGESTION</span>
+          </h3>
+          <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+            <p className="text-gray-300 whitespace-pre-wrap leading-relaxed">{aiResponse}</p>
+          </div>
+          <button
+            onClick={() => setAiResponse(null)}
+            className="mt-4 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-medium transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Pre-Gym Form Modal */}
       {showPreGymForm && (
