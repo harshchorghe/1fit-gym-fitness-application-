@@ -102,7 +102,6 @@ function WorkoutDetailView({ workout, onClose }: { workout: Workout; onClose?: (
         </div>
       </div>
 
-      {/* Action */}
       {!started ? (
         <button
           onClick={handleStartWorkout}
@@ -125,7 +124,6 @@ function WorkoutDetailView({ workout, onClose }: { workout: Workout; onClose?: (
 function MyWorkoutDetailView({ workout, onClose }: { workout: CompletedWorkout; onClose?: () => void }) {
   const [isStarting, setIsStarting] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
-
 
   const handleStartWorkout = () => {
     setIsStarting(true);
@@ -195,6 +193,78 @@ function CustomWorkoutView({ onClose }: { onClose?: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // ── AI Generation States ──
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [generated, setGenerated] = useState(false);
+
+  const generateWithAI = async () => {
+    if (!aiPrompt.trim()) {
+      setAiError('Please describe your desired workout (goals, time, level, equipment...)');
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError(null);
+    setGenerated(false); // Reset previous success
+
+    try {
+      const res = await fetch('/api/workouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: aiPrompt,
+          model: 'openai/gpt-4o-mini',
+        }),
+      });
+
+      if (!res.ok) {
+        if (res.status === 429) {
+          throw new Error('AI rate limit reached — try again in a few minutes');
+        }
+        throw new Error('Failed to generate workout');
+      }
+
+      const { reply } = await res.json();
+
+      let parsed;
+      try {
+        parsed = JSON.parse(reply);
+      } catch {
+        throw new Error('AI gave invalid format — try a clearer description');
+      }
+
+      setTitle(parsed.title || '');
+      setDuration(parsed.duration || '');
+      setDifficulty(
+        ['Beginner', 'Intermediate', 'Advanced'].includes(parsed.difficulty)
+          ? parsed.difficulty
+          : 'Beginner'
+      );
+      setCalories(parsed.calories?.toString() || '');
+      setTrainer(parsed.trainer || 'FitAI');
+
+      // Auto-save the generated workout
+      await addWorkout({
+        title: parsed.title || '',
+        duration: parsed.duration || '',
+        difficulty: ['Beginner', 'Intermediate', 'Advanced'].includes(parsed.difficulty)
+          ? parsed.difficulty
+          : 'Beginner',
+        calories: parsed.calories || 0,
+        trainer: parsed.trainer || 'FitAI',
+      } as any);
+
+      setGenerated(true);
+      setAiPrompt(''); // Clear the prompt after success
+    } catch (err: any) {
+      setAiError(err.message || 'Something went wrong. Try again.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -218,13 +288,14 @@ function CustomWorkoutView({ onClose }: { onClose?: () => void }) {
       setSuccess(true);
       setTimeout(() => {
         onClose?.();
-        // Reset form after close
         setTitle('');
         setDuration('');
         setCalories('');
         setTrainer('');
         setDifficulty('Beginner');
         setSuccess(false);
+        setAiPrompt(''); // reset AI prompt too
+        setGenerated(false); // reset generated state
       }, 2200);
     } catch (err: any) {
       setError('Failed to save workout. Try again.');
@@ -246,98 +317,154 @@ function CustomWorkoutView({ onClose }: { onClose?: () => void }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="space-y-8">
       <h2 className="text-2xl font-bold text-center" style={{ fontFamily: 'Oswald, sans-serif' }}>
         CREATE <span className="text-red-500">CUSTOM WORKOUT</span>
       </h2>
 
-      {error && (
-        <div className="bg-red-900/40 border border-red-700 text-red-200 px-4 py-3 rounded-lg text-center">
-          {error}
+      {/* ── AI GENERATION SECTION ── */}
+      <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 space-y-4">
+        <h3 className="text-xl font-bold text-center text-purple-400">Generate with FitAI ⚡</h3>
+        <p className="text-sm text-gray-400 text-center">
+          Tell me what you want — I'll create a plan for you!
+        </p>
+
+        <textarea
+          value={aiPrompt}
+          onChange={(e) => setAiPrompt(e.target.value)}
+          placeholder="Example: 30 min full body workout at home, beginner level, no equipment, focus on fat burn"
+          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 min-h-[110px] text-gray-200 focus:outline-none focus:border-purple-500 resize-y"
+        />
+
+        {aiError && <p className="text-red-400 text-sm text-center">{aiError}</p>}
+
+        <button
+          type="button"
+          onClick={generateWithAI}
+          disabled={aiLoading || !aiPrompt.trim()}
+          className={`w-full py-3 rounded-lg font-bold transition-all ${
+            aiLoading
+              ? 'bg-gray-600 cursor-wait'
+              : 'bg-purple-600 hover:bg-purple-700 active:scale-98'
+          }`}
+        >
+          {aiLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Generating...
+            </span>
+          ) : (
+            'Generate Plan'
+          )}
+        </button>
+      </div>
+
+      {generated && (
+        <div className="bg-green-900/40 border border-green-700 text-green-200 px-4 py-3 rounded-lg text-center">
+          🎉 Workout plan generated and saved successfully! You can create another or close this modal.
         </div>
       )}
 
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1.5">Workout Title *</label>
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. Evening Power Session"
-          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
-          required
-        />
+      {/* Divider */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-gray-700" />
+        </div>
+        <div className="relative flex justify-center text-sm">
+          <span className="bg-gray-900 px-4 text-gray-500">or fill manually</span>
+        </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1.5">Duration *</label>
-        <input
-          type="text"
-          value={duration}
-          onChange={(e) => setDuration(e.target.value)}
-          placeholder="e.g. 40 min"
-          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
-          required
-        />
-      </div>
+      {/* ── MANUAL FORM ── */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {error && (
+          <div className="bg-red-900/40 border border-red-700 text-red-200 px-4 py-3 rounded-lg text-center">
+            {error}
+          </div>
+        )}
 
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1.5">Difficulty</label>
-        <select
-          value={difficulty}
-          onChange={(e) => setDifficulty(e.target.value)}
-          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
-        >
-          <option value="Beginner">Beginner</option>
-          <option value="Intermediate">Intermediate</option>
-          <option value="Advanced">Advanced</option>
-        </select>
-      </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">Workout Title *</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Evening Power Session"
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
+            required
+          />
+        </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1.5">Estimated Calories *</label>
-        <input
-          type="number"
-          value={calories}
-          onChange={(e) => setCalories(e.target.value)}
-          placeholder="e.g. 420"
-          min="50"
-          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
-          required
-        />
-      </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">Duration *</label>
+          <input
+            type="text"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+            placeholder="e.g. 40 min"
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
+            required
+          />
+        </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1.5">Trainer (optional)</label>
-        <input
-          type="text"
-          value={trainer}
-          onChange={(e) => setTrainer(e.target.value)}
-          placeholder="e.g. Harsh"
-          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
-        />
-      </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">Difficulty</label>
+          <select
+            value={difficulty}
+            onChange={(e) => setDifficulty(e.target.value)}
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
+          >
+            <option value="Beginner">Beginner</option>
+            <option value="Intermediate">Intermediate</option>
+            <option value="Advanced">Advanced</option>
+          </select>
+        </div>
 
-      <div className="flex gap-4 pt-4">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={saving}
-          className="flex-1 bg-gray-700 hover:bg-gray-600 py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className={`flex-1 py-3 rounded-lg font-bold transition-colors ${
-            saving ? 'bg-gray-600 cursor-wait' : 'bg-red-600 hover:bg-red-700'
-          }`}
-        >
-          {saving ? 'Saving...' : 'Save Workout'}
-        </button>
-      </div>
-    </form>
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">Estimated Calories *</label>
+          <input
+            type="number"
+            value={calories}
+            onChange={(e) => setCalories(e.target.value)}
+            placeholder="e.g. 420"
+            min="50"
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">Trainer (optional)</label>
+          <input
+            type="text"
+            value={trainer}
+            onChange={(e) => setTrainer(e.target.value)}
+            placeholder="e.g. Harsh"
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500"
+          />
+        </div>
+
+        <div className="flex gap-4 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="flex-1 bg-gray-700 hover:bg-gray-600 py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className={`flex-1 py-3 rounded-lg font-bold transition-colors ${
+              saving ? 'bg-gray-600 cursor-wait' : 'bg-red-600 hover:bg-red-700'
+            }`}
+          >
+            {saving ? 'Saving...' : 'Save Workout'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -387,7 +514,6 @@ export default function WorkoutsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [startStatus, setStartStatus] = useState<Record<string, 'idle' | 'loading' | 'done'>>({});
 
-  // remove a completed workout both locally and in Firestore
   const handleRemoveMyWorkout = async (entryId: string) => {
     if (!user?.uid) return;
 
@@ -402,13 +528,11 @@ export default function WorkoutsScreen() {
   const openModal = (type: ModalType, payload?: any) => setModal({ type, payload });
   const closeModal = () => setModal(null);
 
-  // Auth listener
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((u) => setUser(u));
     return unsubscribe;
   }, []);
 
-  // Load public workouts
   useEffect(() => {
     async function fetchData() {
       try {
@@ -425,7 +549,6 @@ export default function WorkoutsScreen() {
     fetchData();
   }, []);
 
-  // Load user's completed workouts
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -469,7 +592,6 @@ export default function WorkoutsScreen() {
         completedAt: serverTimestamp(),
       });
 
-      // optimistic update
       const optimistic = {
         id: 'optimistic-' + Date.now(),
         workoutId: workout.id!,
@@ -532,7 +654,6 @@ export default function WorkoutsScreen() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
-      {/* Modal */}
       {modal && (
         <Modal title={modalTitles[modal.type]} onClose={closeModal}>
           {renderModalContent()}
@@ -546,9 +667,6 @@ export default function WorkoutsScreen() {
         <p className="text-gray-400 text-lg">Choose your next challenge</p>
       </header>
 
-      {/* Categories - unchanged */}
-
-      {/* Recommended */}
       <section>
         <h2 className="text-3xl font-bold mb-8" style={{ fontFamily: 'Oswald, sans-serif' }}>
           RECOMMENDED <span className="text-red-500">FOR YOU</span>
@@ -615,7 +733,6 @@ export default function WorkoutsScreen() {
         </div>
       </section>
 
-      {/* My Workouts */}
       <section className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-2xl p-8">
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-3xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>
@@ -645,7 +762,6 @@ export default function WorkoutsScreen() {
                 onClick={() => openModal('myWorkout', entry)}
                 className="relative bg-black/60 border border-gray-800 p-6 rounded-xl hover:border-red-600/70 transition-all cursor-pointer group"
               >
-                {/* delete icon */}
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={(e) => {

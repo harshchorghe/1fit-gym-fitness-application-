@@ -21,38 +21,32 @@ export async function POST(req: NextRequest) {
 
     const systemInstruction = `
 You are an expert certified personal trainer. Always create safe, practical, motivating workout plans.
-Respond **only** with a well-formatted workout plan using this exact markdown structure — no extra chit-chat:
+Respond **only** with valid JSON, no extra text, markdown, or explanations. Use exactly this structure:
 
-**Workout Plan: [Catchy Title]**
-- **Duration**: 30 minutes
-- **Level**: Beginner / Intermediate / Advanced (match user request)
-- **Focus**: [e.g. Full-body, Strength + Cardio, Fat burn...]
-- **Equipment**: [Bodyweight / Dumbbells / Gym machines / None...]
+{
+  "title": "Short catchy title",
+  "duration": "e.g. 45 min",
+  "difficulty": "Beginner" | "Intermediate" | "Advanced",
+  "calories": number (estimated kcal burn),
+  "trainer": "FitAI",
+  "equipment": "Bodyweight / Dumbbells / Gym machines / None",
+  "focus": "Full-body, Strength + Cardio, Fat burn...",
+  "warmup": ["Exercise 1 – description", "Exercise 2 – ..."],
+  "exercises": [
+    {
+      "name": "Exercise Name",
+      "sets": "X",
+      "reps": "Y–Z",
+      "rest": "XX seconds",
+      "tips": "brief form note",
+      "modification": "for beginners/injuries"
+    }
+  ],
+  "cooldown": ["Stretch 1 – hold XX sec", "Stretch 2 – ..."],
+  "notes": ["Safety reminders", "Hydration tips", "Progression advice"]
+}
 
-**Warm-up (4–5 minutes)**
-- Exercise 1 – description (time or reps)
-- Exercise 2 – ...
-
-**Main Workout**
-1. **Exercise Name**
-   - Sets × Reps: X × Y–Z
-   - Rest: XX seconds
-   - Tips / Form: brief note
-   - Modification: for beginners / injuries
-2. ...
-
-**Cool-down & Stretching (4–5 minutes)**
-- Stretch 1 – hold XX sec per side
-- ...
-
-**Quick Notes**
-- Safety reminders
-- Hydration / breathing tips
-- How to progress
-- Approx. intensity / calories
-
-Use bold for exercise names, bullets/lists for clarity. Be encouraging. Tailor to energy level, mood, injuries if mentioned. Never give medical advice.
-`;
+Create a safe, realistic, personalized workout plan based on the user's description. Use reasonable defaults if info is missing. Output ONLY the JSON object.`;
 
     const fullPrompt = `${systemInstruction}\n\nUser request:\n${userPrompt}`;
 
@@ -60,7 +54,7 @@ Use bold for exercise names, bullets/lists for clarity. Be encouraging. Tailor t
       temperature: 0.7,
       topP: 0.92,
       topK: 40,
-      maxOutputTokens: 1400,
+      maxOutputTokens: 4000,  // Increased from 1400
     };
 
     const result = await model.generateContent({
@@ -69,9 +63,41 @@ Use bold for exercise names, bullets/lists for clarity. Be encouraging. Tailor t
     });
 
     const response = await result.response;
-    const text = response.text();
+    const text = response.text().trim();
 
-    return NextResponse.json({ text });
+    // Clean the response - remove markdown code blocks if present
+    let cleanText = text;
+    if (cleanText.startsWith('```json')) {
+      cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (cleanText.startsWith('```')) {
+      cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+
+    // Additional cleaning - remove any remaining backticks or language identifiers
+    cleanText = cleanText.replace(/```/g, '').trim();
+
+    // Try to find JSON object boundaries
+    const jsonStart = cleanText.indexOf('{');
+    const jsonEnd = cleanText.lastIndexOf('}');
+    
+    if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+      cleanText = cleanText.substring(jsonStart, jsonEnd + 1);
+    }
+
+    // Parse the JSON response
+    let parsed;
+    try {
+      parsed = JSON.parse(cleanText);
+    } catch (parseError) {
+      console.error("Failed to parse Gemini response as JSON:", cleanText);
+      console.error("Parse error:", parseError);
+      return NextResponse.json(
+        { error: "AI returned invalid JSON format. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ reply: JSON.stringify(parsed) });
 
   } catch (error: any) {
     console.error("Gemini API error:", error);

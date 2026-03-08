@@ -33,6 +33,7 @@ export default function QuickActions() {
   const [showProgressReport, setShowProgressReport] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [generatedWorkout, setGeneratedWorkout] = useState<any>(null);
 
   const [preGymData, setPreGymData] = useState({
     weight: '',
@@ -101,9 +102,10 @@ export default function QuickActions() {
   const askAI = async () => {
     setIsLoadingAI(true);
     setAiResponse(null);
+    setGeneratedWorkout(null);
 
     try {
-      let prompt = "Suggest a balanced 30-minute gym or home workout plan for general fitness.";
+      let prompt = "Create a quick 30-minute workout plan for general fitness.";
 
       if (activeSession) {
         const { beforeGym } = activeSession;
@@ -123,24 +125,24 @@ Please create a **30-minute workout plan** that fits my current state.
 - If energy low/tired → lighter intensity, more rest, bodyweight focus
 - If pumped/good mood → add intensity or compound lifts
 - Avoid aggravating any mentioned injuries
-- Include warm-up, main circuit/sets/reps/rest, cool-down stretches
-- Keep total time ~30 min
+- Focus on full body or targeted areas based on energy
 `;
       }
 
-      const res = await fetch("/api/gemini", {
+      const res = await fetch("/api/workouts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.error || "AI request failed");
+        throw new Error("Failed to generate workout");
       }
 
-      setAiResponse(data.text);
+      const { reply } = await res.json();
+      const parsed = JSON.parse(reply);
+
+      setGeneratedWorkout(parsed);
     } catch (error: any) {
       console.error("AI fetch error:", error);
       setAiResponse(`Error getting suggestion: ${error.message || "Try again later."}`);
@@ -217,22 +219,54 @@ Please create a **30-minute workout plan** that fits my current state.
         </div>
       </div>
 
-      {/* AI Response Display */}
-      {aiResponse && (
+      {/* AI Generated Workout Display */}
+      {generatedWorkout && (
         <div className="bg-gradient-to-br from-purple-900/20 to-blue-900/20 border border-purple-500/30 p-6 rounded-lg">
           <h3 className="text-xl font-bold mb-4 text-purple-400 flex items-center space-x-2">
             <span className="text-2xl">🤖</span>
-            <span>AI WORKOUT SUGGESTION</span>
+            <span>AI GENERATED WORKOUT</span>
           </h3>
-          <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-            <p className="text-gray-300 whitespace-pre-wrap leading-relaxed">{aiResponse}</p>
+          <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 space-y-4">
+            <h4 className="text-xl font-bold text-red-400">{generatedWorkout.title}</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div className="bg-gray-800 p-3 rounded">
+                <div className="text-sm text-gray-400">Duration</div>
+                <div className="text-lg font-bold text-red-500">{generatedWorkout.duration}</div>
+              </div>
+              <div className="bg-gray-800 p-3 rounded">
+                <div className="text-sm text-gray-400">Difficulty</div>
+                <div className="text-lg font-bold text-red-500">{generatedWorkout.difficulty}</div>
+              </div>
+              <div className="bg-gray-800 p-3 rounded">
+                <div className="text-sm text-gray-400">Calories</div>
+                <div className="text-lg font-bold text-red-500">{generatedWorkout.calories}</div>
+              </div>
+              <div className="bg-gray-800 p-3 rounded">
+                <div className="text-sm text-gray-400">Trainer</div>
+                <div className="text-lg font-bold text-red-500">{generatedWorkout.trainer}</div>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={() => setAiResponse(null)}
-            className="mt-4 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-medium transition-colors"
-          >
-            Dismiss
-          </button>
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => setGeneratedWorkout(null)}
+              className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-medium transition-colors"
+            >
+              Dismiss
+            </button>
+            <button
+              className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-medium transition-colors"
+            >
+              Start This Workout
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* AI Error Display */}
+      {aiResponse && (
+        <div className="bg-red-900/40 border border-red-700 text-red-200 px-4 py-3 rounded-lg text-center">
+          {aiResponse}
         </div>
       )}
 

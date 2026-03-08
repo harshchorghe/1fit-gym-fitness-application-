@@ -17,6 +17,91 @@ export default function NutritionScreen() {
   const [error, setError] = useState<string | null>(null);
   const [addingPlan, setAddingPlan] = useState<string | null>(null);
 
+  // ── AI Generation States ──
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [generatedPlan, setGeneratedPlan] = useState<any>(null);
+  const [savingPlan, setSavingPlan] = useState(false);
+
+  const generateWithAI = async () => {
+    if (!aiPrompt.trim()) {
+      setAiError('Please describe your desired meal plan (goals, preferences, restrictions...)');
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError(null);
+    setGeneratedPlan(null);
+
+    try {
+      const res = await fetch('/api/nutrition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: aiPrompt,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to generate meal plan');
+      }
+
+      const { reply } = await res.json();
+      const parsed = JSON.parse(reply);
+
+      setGeneratedPlan(parsed);
+    } catch (err: any) {
+      setAiError(err.message || 'Something went wrong. Try again.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const saveGeneratedPlan = async () => {
+    if (!generatedPlan) return;
+
+    setSavingPlan(true);
+    try {
+      // Format the generated plan to match MealPlan interface
+      const planToSave: MealPlan = {
+        id: '', // Will be set by Firestore
+        name: generatedPlan.title,
+        calories: generatedPlan.calories,
+        protein: generatedPlan.protein,
+        carbs: generatedPlan.carbs,
+        fats: generatedPlan.fats,
+        description: `AI-generated meal plan: ${generatedPlan.title}`,
+        duration: '1 day',
+        meals: generatedPlan.meals?.map((meal: any) => ({
+          mealType: meal.name,
+          name: meal.name,
+          items: meal.items,
+          calories: meal.calories,
+          protein: meal.macros?.protein || 0,
+          carbs: meal.macros?.carbs || 0,
+          fats: meal.macros?.fats || 0,
+        })),
+      };
+
+      await logMealPlan(planToSave);
+
+      // Refresh data
+      const updatedMeals = await getTodayLoggedMeals();
+      setTodayMeals(updatedMeals);
+      updateMacros(updatedMeals);
+
+      setGeneratedPlan(null);
+      setAiPrompt('');
+      alert('Meal plan logged for today!');
+    } catch (err: any) {
+      console.error('Failed to save plan:', err);
+      alert(`Could not save plan: ${err.message}`);
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
   const [todayMacros, setTodayMacros] = useState({
     calories: { consumed: 0, target: 2200, remaining: 2200 },
     protein:  { consumed: 0, target: 180, unit: 'g' },
@@ -181,6 +266,128 @@ export default function NutritionScreen() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* AI Meal Plan Generator */}
+      <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6 rounded-2xl">
+        <h2 className="text-2xl font-bold mb-6" style={{ fontFamily: 'Oswald, sans-serif' }}>
+          AI <span className="text-green-500">MEAL PLAN</span> GENERATOR
+        </h2>
+
+        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 space-y-4">
+          <h3 className="text-xl font-bold text-center text-green-400">Generate with Gemini AI ⚡</h3>
+          <p className="text-sm text-gray-400 text-center">
+            Tell me what you want — I'll create a personalized meal plan for you!
+          </p>
+
+          <textarea
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            placeholder="Example: High protein meal plan for muscle gain, 2500 calories, vegetarian, no dairy, focus on weightlifting recovery"
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 min-h-[110px] text-gray-200 focus:outline-none focus:border-green-500 resize-y"
+          />
+
+          {aiError && <p className="text-red-400 text-sm text-center">{aiError}</p>}
+
+          <button
+            type="button"
+            onClick={generateWithAI}
+            disabled={aiLoading || !aiPrompt.trim()}
+            className={`w-full py-3 rounded-lg font-bold transition-all ${
+              aiLoading
+                ? 'bg-gray-600 cursor-wait'
+                : 'bg-green-600 hover:bg-green-700 active:scale-98'
+            }`}
+          >
+            {aiLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Generating...
+              </span>
+            ) : (
+              'Generate Meal Plan'
+            )}
+          </button>
+        </div>
+
+        {generatedPlan && (
+          <div className="mt-6 bg-green-900/20 border border-green-500/30 p-6 rounded-lg">
+            <h3 className="text-xl font-bold mb-4 text-green-400">🎉 Generated Meal Plan</h3>
+            <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 space-y-4">
+              <h4 className="text-xl font-bold text-green-400">{generatedPlan.title}</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div className="bg-gray-800 p-3 rounded">
+                  <div className="text-sm text-gray-400">Calories</div>
+                  <div className="text-lg font-bold text-red-500">{generatedPlan.calories}</div>
+                </div>
+                <div className="bg-gray-800 p-3 rounded">
+                  <div className="text-sm text-gray-400">Protein</div>
+                  <div className="text-lg font-bold text-blue-500">{generatedPlan.protein}g</div>
+                </div>
+                <div className="bg-gray-800 p-3 rounded">
+                  <div className="text-sm text-gray-400">Carbs</div>
+                  <div className="text-lg font-bold text-yellow-500">{generatedPlan.carbs}g</div>
+                </div>
+                <div className="bg-gray-800 p-3 rounded">
+                  <div className="text-sm text-gray-400">Fats</div>
+                  <div className="text-lg font-bold text-orange-500">{generatedPlan.fats}g</div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {generatedPlan.meals?.map((meal: any, index: number) => (
+                  <div key={index} className="border-l-4 border-green-500 bg-green-900/10 p-4 rounded">
+                    <div className="flex justify-between items-start mb-2">
+                      <h5 className="font-bold text-lg">{meal.name}</h5>
+                      <span className="text-sm text-gray-400">{meal.time}</span>
+                    </div>
+                    <ul className="text-sm text-gray-300 mb-2">
+                      {meal.items?.map((item: string, i: number) => (
+                        <li key={i}>• {item}</li>
+                      ))}
+                    </ul>
+                    <div className="flex gap-4 text-xs text-gray-400">
+                      <span>{meal.calories} kcal</span>
+                      <span>P: {meal.macros?.protein}g</span>
+                      <span>C: {meal.macros?.carbs}g</span>
+                      <span>F: {meal.macros?.fats}g</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {generatedPlan.notes && (
+                <div className="bg-blue-900/20 border border-blue-500/30 p-3 rounded">
+                  <h6 className="font-bold text-blue-400 mb-2">💡 Nutrition Notes</h6>
+                  <ul className="text-sm text-gray-300">
+                    {generatedPlan.notes.map((note: string, i: number) => (
+                      <li key={i}>• {note}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setGeneratedPlan(null)}
+                className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-medium transition-colors"
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={saveGeneratedPlan}
+                disabled={savingPlan}
+                className={`px-4 py-2 rounded font-medium transition-colors ${
+                  savingPlan
+                    ? 'bg-gray-600 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {savingPlan ? 'Saving...' : 'Log This Plan'}
+              </button>
+            </div>
           </div>
         )}
       </div>
