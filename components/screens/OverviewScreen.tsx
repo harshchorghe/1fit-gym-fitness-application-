@@ -52,24 +52,24 @@ export default function OverviewScreen() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-10">
 
         {/* Hero / Welcome Section */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-950/40 via-gray-950 to-black border border-red-900/30 p-8 md:p-12 shadow-2xl">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-950/40 via-gray-950 to-black border border-red-900/30 p-8 md:p-14 mt-8 shadow-2xl">
           <div className="absolute -top-24 -right-24 w-96 h-96 bg-red-600/10 rounded-full blur-3xl"></div>
           
           <div className="relative z-10">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
               <div>
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight mb-3" style={{ fontFamily: 'Oswald, sans-serif' }}>
+                <h1 className="text-3xl md:text-3xl lg:text-3xl font-black tracking-tight mb-3" style={{ fontFamily: 'Oswald, sans-serif' }}>
                   WELCOME BACK, <span className="text-red-500">{firstName}</span>
                 </h1>
                 <p className="text-xl text-gray-300">
-                  Ready to dominate today? 🔥
+                  Ready to dominate today? 
                 </p>
               </div>
 
               {/* Streak & Membership Badge */}
               <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-                <div className="bg-gradient-to-br from-orange-900/50 to-red-900/40 border border-orange-700/50 rounded-2xl px-6 py-4 text-center min-w-[180px]">
-                  <div className="text-4xl font-black text-orange-400 mb-1">
+                <div className="bg-gradient-to-br from-orange-900/50 to-red-900/40 border border-orange-700/50 rounded-2xl px-6 py-4 text-center min-w-[140px]">
+                  <div className="text-2xl font-black text-orange-400 mb-1">
                     {streak}
                   </div>
                   <div className="text-sm text-orange-300 font-medium">
