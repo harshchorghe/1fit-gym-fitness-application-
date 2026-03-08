@@ -155,7 +155,7 @@ Please create a **30-minute workout plan** that fits my current state.
 
   return (
     <div className="space-y-4">
-      <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 p-6 animate-slide-in stagger-3">
+      <div className="bg-gradient-to-br rounded-lg from-gray-900 to-black border border-gray-800 p-6 animate-slide-in stagger-3">
         <h2 className="text-2xl font-bold mb-4" style={{ fontFamily: 'Oswald, sans-serif' }}>
           QUICK <span className="text-red-500">ACTIONS</span>
         </h2>
@@ -164,14 +164,14 @@ Please create a **30-minute workout plan** that fits my current state.
             <button
               onClick={handleStartSession}
               disabled={isStartingSession}
-              className={`relative w-full bg-red-500 hover:bg-red-600 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2 overflow-hidden ${
+              className={`relative w-full rounded-xl bg-red-500 hover:bg-red-600 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2 overflow-hidden ${
                 isStartingSession ? 'animate-button-pop cursor-wait opacity-95' : ''
               }`}
             >
               {isStartingSession && (
-                <span className="absolute inset-0 bg-white/10 animate-shimmer" aria-hidden="true"></span>
+                <span className="absolute  inset-0 bg-white/10 animate-shimmer" aria-hidden="true"></span>
               )}
-              <span className="text-xl">🔥</span>
+              
               <span>{isStartingSession ? 'STARTING SESSION...' : 'PRE WORKOUT'}</span>
             </button>
           ) : (
@@ -187,7 +187,7 @@ Please create a **30-minute workout plan** that fits my current state.
               {!showPostGymForm && (
                 <button
                   onClick={handleCompleteSession}
-                  className="w-full bg-green-500 hover:bg-green-600 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2"
+                  className="w-full rounded-xl bg-green-500 hover:bg-green-600 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2"
                 >
                   <span className="text-xl">✅</span>
                   <span>POST WORKOUT</span>
@@ -198,7 +198,6 @@ Please create a **30-minute workout plan** that fits my current state.
                   onClick={() => setShowProgressReport(!showProgressReport)}
                   className="w-full bg-blue-500 hover:bg-blue-600 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2"
                 >
-                  <span className="text-xl">📊</span>
                   <span>{showProgressReport ? 'HIDE PROGRESS' : 'VIEW PROGRESS'}</span>
                 </button>
               )}
@@ -209,11 +208,11 @@ Please create a **30-minute workout plan** that fits my current state.
           <button
             onClick={askAI}
             disabled={isLoadingAI}
-            className={`w-full bg-purple-500 hover:bg-purple-600 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2 ${
+            className={`w-full  rounded-xl bg-purple-500 hover:bg-purple-600 p-4 font-bold transition-all transform hover:scale-105 flex items-center justify-center space-x-2 ${
               isLoadingAI ? 'opacity-75 cursor-not-allowed' : ''
             }`}
           >
-            <span className="text-xl">🤖</span>
+           
             <span>{isLoadingAI ? 'GETTING AI SUGGESTION...' : 'AI WORKOUT ASSISTANT'}</span>
           </button>
         </div>
@@ -223,7 +222,7 @@ Please create a **30-minute workout plan** that fits my current state.
       {generatedWorkout && (
         <div className="bg-gradient-to-br from-purple-900/20 to-blue-900/20 border border-purple-500/30 p-6 rounded-lg">
           <h3 className="text-xl font-bold mb-4 text-purple-400 flex items-center space-x-2">
-            <span className="text-2xl">🤖</span>
+            
             <span>AI GENERATED WORKOUT</span>
           </h3>
           <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 space-y-4">
