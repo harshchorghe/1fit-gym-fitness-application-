@@ -15,6 +15,35 @@ interface WeekStatsProps {
   user: AppUser;
 }
 
+function parseDurationToMinutes(duration: unknown): number {
+  if (typeof duration === 'number' && Number.isFinite(duration)) {
+    return Math.max(0, Math.round(duration));
+  }
+
+  if (typeof duration !== 'string') return 0;
+
+  const value = duration.trim().toLowerCase();
+  if (!value) return 0;
+
+  // Supports formats like: "50", "50 min", "1h 20m", "1 hr 15 min"
+  const hourMatch = value.match(/(\d+)\s*(h|hr|hrs|hour|hours)/);
+  const minuteMatch = value.match(/(\d+)\s*(m|min|mins|minute|minutes)/);
+
+  const hours = hourMatch ? Number(hourMatch[1]) : 0;
+  const minutes = minuteMatch ? Number(minuteMatch[1]) : 0;
+
+  if (hours > 0 || minutes > 0) {
+    return hours * 60 + minutes;
+  }
+
+  const fallback = Number(value.replace(/[^\d.]/g, ''));
+  if (Number.isFinite(fallback)) {
+    return Math.max(0, Math.round(fallback));
+  }
+
+  return 0;
+}
+
 export default function WeekStats({ user }: WeekStatsProps) {
   const [stats, setStats] = useState({
     workouts: 0,
@@ -57,7 +86,7 @@ export default function WeekStats({ user }: WeekStatsProps) {
           const data = doc.data();
           workoutCount++;
 
-          const durationMin = typeof data.duration === 'number' ? data.duration : 0;
+          const durationMin = parseDurationToMinutes(data.duration);
           totalMinutes += durationMin;
 
           totalCalories += typeof data.calories === 'number' ? data.calories : 0;

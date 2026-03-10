@@ -410,7 +410,7 @@ function CustomWorkoutView({ onClose }: { onClose?: () => void }) {
 
       {generated && (
         <div className="bg-green-900/40 border border-green-700 text-green-200 px-4 py-3 rounded-lg text-center">
-          🎉 Workout plan generated and saved successfully! You can create another or close this modal.
+           Workout plan generated and saved successfully! You can create another or close this modal.
         </div>
       )}
 
@@ -710,7 +710,7 @@ export default function WorkoutsScreen() {
         </Modal>
       )}
 
-      <header className="text-center md:text-left">
+      <header className="text-center mt-8 md:text-left">
         <h1 className="text-5xl font-bold mb-3" style={{ fontFamily: 'Oswald, sans-serif' }}>
           YOUR <span className="text-red-500">WORKOUTS</span>
         </h1>

@@ -221,7 +221,7 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 p-4 md:p-8">
+    <div className="max-w-5xl mx-auto mt-6 space-y-8 p-4 md:p-8">
       {/* Header */}
       <div>
         <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-1" style={{ fontFamily: 'Oswald, sans-serif' }}>

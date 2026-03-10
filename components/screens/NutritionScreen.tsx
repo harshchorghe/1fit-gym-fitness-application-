@@ -191,7 +191,7 @@ export default function NutritionScreen() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-12">
+    <div className="max-w-7xl mx-auto mt-14 space-y-8 ">
       {/* Header */}
       <div>
         <h1 className="text-5xl font-bold mb-2" style={{ fontFamily: 'Oswald, sans-serif' }}>

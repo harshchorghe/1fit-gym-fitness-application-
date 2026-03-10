@@ -13,12 +13,18 @@ import {
 
 type FilterId = 'all' | 'strength' | 'cardio' | 'yoga' | 'hiit';
 
-const filters = [
-  { id: 'all', name: 'All Classes', icon: '🎯' },
-  { id: 'strength', name: 'Strength', icon: '💪' },
-  { id: 'cardio', name: 'Cardio', icon: '🏃' },
-  { id: 'yoga', name: 'Yoga', icon: '🧘' },
-  { id: 'hiit', name: 'HIIT', icon: '⚡' },
+type ClassFilter = {
+  id: FilterId;
+  name: string;
+  icon: string;
+};
+
+const filters: ClassFilter[] = [
+  { id: 'all', name: 'All Classes', icon: 'All' },
+  { id: 'strength', name: 'Strength', icon: 'Strength' },
+  { id: 'cardio', name: 'Cardio', icon: 'Cardio' },
+  { id: 'yoga', name: 'Yoga', icon: 'Yoga' },
+  { id: 'hiit', name: 'HIIT', icon: 'HIIT' },
 ];
 
 export default function ClassesScreen() {
@@ -154,7 +160,7 @@ export default function ClassesScreen() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
       {/* Header & Filters */}
-      <header className="text-center md:text-left">
+      <header className="text-center mt-8 md:text-left">
         <h1 className="text-5xl font-bold mb-3" style={{ fontFamily: 'Oswald, sans-serif' }}>
           GROUP <span className="text-red-500">CLASSES</span>
         </h1>
@@ -228,10 +234,10 @@ export default function ClassesScreen() {
                 <div className="flex-1">
                   <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Oswald, sans-serif' }}>{cls.title}</h3>
                   <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-300">
-                    <div>⏰ {cls.time}</div>
-                    <div>👤 {cls.trainer}</div>
-                    <div>🏷️ {cls.type}</div>
-                    <div>📊 {cls.intensity} Intensity</div>
+                    <div> {cls.time}</div>
+                    <div> {cls.trainer}</div>
+                    <div> {cls.type}</div>
+                    <div> {cls.intensity} Intensity</div>
                   </div>
                 </div>
 
