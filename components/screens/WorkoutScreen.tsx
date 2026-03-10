@@ -1,7 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { getWorkouts, Workout, addWorkout } from '@/lib/firestore/Workouts';
+import { useRouter } from 'next/navigation';
+import {
+  getWorkouts,
+  Workout,
+  addWorkout,
+  addWorkoutDetails,
+  WorkoutDetailInput,
+} from '@/lib/firestore/Workouts';
 import { deleteCompletedWorkout } from '@/lib/firestore/userWorkouts';
 import { auth, db } from '@/lib/firebase';
 import {
@@ -199,6 +206,43 @@ function CustomWorkoutView({ onClose }: { onClose?: () => void }) {
   const [aiError, setAiError] = useState<string | null>(null);
   const [generated, setGenerated] = useState(false);
 
+  const parseDifficulty = (value: unknown): string => {
+    const normalized = String(value ?? '').trim();
+    return ['Beginner', 'Intermediate', 'Advanced'].includes(normalized)
+      ? normalized
+      : 'Beginner';
+  };
+
+  const parseExercises = (payload: Record<string, unknown>): WorkoutDetailInput[] => {
+    const candidates = [payload.exercises, payload.steps, payload.details];
+    const rawList = candidates.find(Array.isArray);
+
+    if (!Array.isArray(rawList)) return [];
+
+    const parsed: WorkoutDetailInput[] = [];
+
+    rawList.forEach((item, index) => {
+      if (!item || typeof item !== 'object') return;
+
+      const step = item as Record<string, unknown>;
+      const name = String(step.name ?? step.title ?? '').trim();
+      if (!name) return;
+
+      parsed.push({
+        order: Number(step.order ?? index + 1),
+        name,
+        sets: String(step.sets ?? '-'),
+        reps: String(step.reps ?? '-'),
+        rest: String(step.rest ?? '-'),
+        tip: String(step.tip ?? ''),
+        move: String(step.move ?? 'jumping-jack'),
+        gifUrl: step.gifUrl ? String(step.gifUrl) : undefined,
+      });
+    });
+
+    return parsed;
+  };
+
   const generateWithAI = async () => {
     if (!aiPrompt.trim()) {
       setAiError('Please describe your desired workout (goals, time, level, equipment...)');
@@ -228,33 +272,38 @@ function CustomWorkoutView({ onClose }: { onClose?: () => void }) {
 
       const { reply } = await res.json();
 
-      let parsed;
+      let parsed: Record<string, unknown>;
       try {
-        parsed = JSON.parse(reply);
+        parsed = JSON.parse(reply) as Record<string, unknown>;
       } catch {
         throw new Error('AI gave invalid format — try a clearer description');
       }
 
-      setTitle(parsed.title || '');
-      setDuration(parsed.duration || '');
-      setDifficulty(
-        ['Beginner', 'Intermediate', 'Advanced'].includes(parsed.difficulty)
-          ? parsed.difficulty
-          : 'Beginner'
-      );
-      setCalories(parsed.calories?.toString() || '');
-      setTrainer(parsed.trainer || 'FitAI');
+      const parsedTitle = String(parsed.title ?? '').trim();
+      const parsedDuration = String(parsed.duration ?? '').trim();
+      const parsedDifficulty = parseDifficulty(parsed.difficulty);
+      const parsedCalories = Number(parsed.calories ?? 0);
+      const parsedTrainer = String(parsed.trainer ?? 'FitAI').trim() || 'FitAI';
+      const parsedExercises = parseExercises(parsed);
+
+      setTitle(parsedTitle);
+      setDuration(parsedDuration);
+      setDifficulty(parsedDifficulty);
+      setCalories(parsedCalories > 0 ? parsedCalories.toString() : '');
+      setTrainer(parsedTrainer);
 
       // Auto-save the generated workout
-      await addWorkout({
-        title: parsed.title || '',
-        duration: parsed.duration || '',
-        difficulty: ['Beginner', 'Intermediate', 'Advanced'].includes(parsed.difficulty)
-          ? parsed.difficulty
-          : 'Beginner',
-        calories: parsed.calories || 0,
-        trainer: parsed.trainer || 'FitAI',
-      } as any);
+      const workoutId = await addWorkout({
+        title: parsedTitle || 'AI Workout',
+        duration: parsedDuration || '30 min',
+        difficulty: parsedDifficulty,
+        calories: parsedCalories > 0 ? parsedCalories : 250,
+        trainer: parsedTrainer,
+      });
+
+      if (parsedExercises.length > 0) {
+        await addWorkoutDetails(workoutId, parsedExercises);
+      }
 
       setGenerated(true);
       setAiPrompt(''); // Clear the prompt after success
@@ -506,6 +555,7 @@ const modalTitles: Record<ModalType, string> = {
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────
 
 export default function WorkoutsScreen() {
+  const router = useRouter();
   const [modal, setModal] = useState<ModalState>(null);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [myCompletedWorkouts, setMyCompletedWorkouts] = useState<CompletedWorkout[]>([]);
@@ -721,7 +771,13 @@ export default function WorkoutsScreen() {
                   </button>
 
                   <button
-                    onClick={() => openModal('workout', w)}
+                    onClick={() => {
+                      if (w.id) {
+                        router.push(`/home/workouts/${w.id}`);
+                        return;
+                      }
+                      openModal('workout', w);
+                    }}
                     className="flex-1 py-3.5 border border-gray-700 hover:border-red-600 rounded-xl font-semibold transition-colors"
                   >
                     Details

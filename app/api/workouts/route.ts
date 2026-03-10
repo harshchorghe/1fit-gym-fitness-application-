@@ -31,9 +31,21 @@ Respond ONLY with valid JSON, no extra text, markdown, or explanations. Use exac
   "duration": "e.g. 45 min",
   "difficulty": "Beginner" | "Intermediate" | "Advanced",
   "calories": number (estimated kcal burn),
-  "trainer": "FitAI"
+  "trainer": "FitAI",
+  "exercises": [
+    {
+      "order": number,
+      "name": "Exercise name",
+      "sets": "e.g. 3",
+      "reps": "e.g. 12 or 40 sec",
+      "rest": "e.g. 45s",
+      "tip": "Short form cue",
+      "move": "jumping-jack|squat|pushup|plank|lunge|burpee",
+      "gifUrl": "optional image/gif URL"
+    }
+  ]
 }
-Create a safe, realistic, personalized workout plan based on the user's description. Use reasonable defaults if info is missing. Output ONLY the JSON object.`
+Create a safe, realistic, personalized workout plan based on the user's description. Include 4 to 8 exercises. Use reasonable defaults if info is missing. Output ONLY the JSON object.`
         },
         { role: 'user', content: prompt },
       ],
