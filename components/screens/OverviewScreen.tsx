@@ -1,14 +1,13 @@
 'use client';
 
 import { useUserData } from '@/lib/hooks/useUserData';
-import TodaySchedule from '../sections/TodaySchedule';
 import QuickActions from '../sections/QuickActions';
 import WeekStats from '../sections/WeekStats';
 import RecentWorkouts from '../sections/RecentWorkouts';
 import GoalsProgress from '../sections/GoalsProgress';
 import PersonalRecords from '../sections/TodayMealsOverview';
-import Achievements from '../sections/Achievements';
 import UpcomingClasses from '../sections/UpcomingClasses';
+import NearbyGymsMap from '../sections/NearbyGymsMap';
 
 export default function OverviewScreen() {
   const { user, loading, error } = useUserData();
@@ -98,6 +97,8 @@ export default function OverviewScreen() {
             <QuickActions />
           </div>
         </div>
+
+        <NearbyGymsMap />
 
         {/* Secondary sections */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 xl:gap-8">
