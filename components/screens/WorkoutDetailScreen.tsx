@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import PoseDetector from '@/components/PoseDetector';
@@ -10,6 +10,7 @@ import {
   Workout,
   WorkoutDetailStep,
 } from '@/lib/firestore/Workouts';
+import { evaluateWorkoutQuality } from '@/lib/workoutQuality';
 
 type MoveType = 'jumping-jack' | 'squat' | 'pushup' | 'plank' | 'lunge' | 'burpee';
 
@@ -51,6 +52,43 @@ function MovePreview({ move }: { move: MoveType }) {
   );
 }
 
+function parseRestSeconds(value: string | undefined): number {
+  if (!value) {
+    return 60;
+  }
+
+  const normalized = value.toLowerCase().trim();
+  const minuteMatch = normalized.match(/(\d+(?:\.\d+)?)\s*(m|min|minute|minutes)/);
+  if (minuteMatch) {
+    const minutes = Number(minuteMatch[1]);
+    if (Number.isFinite(minutes) && minutes > 0) {
+      return Math.max(1, Math.round(minutes * 60));
+    }
+  }
+
+  const secondMatch = normalized.match(/(\d+(?:\.\d+)?)\s*(s|sec|second|seconds)/);
+  if (secondMatch) {
+    const seconds = Number(secondMatch[1]);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return Math.max(1, Math.round(seconds));
+    }
+  }
+
+  const fallback = normalized.match(/\d+/);
+  if (!fallback) {
+    return 60;
+  }
+
+  const numeric = Number(fallback[0]);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 60;
+}
+
+function formatClock(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
 export default function WorkoutDetailScreen({ workoutId }: { workoutId: string }) {
   const router = useRouter();
   const [workout, setWorkout] = useState<Workout | null>(null);
@@ -59,6 +97,8 @@ export default function WorkoutDetailScreen({ workoutId }: { workoutId: string }
   const [error, setError] = useState<string | null>(null);
   const [workoutStarted, setWorkoutStarted] = useState(false);
   const [cameraCoachEnabled, setCameraCoachEnabled] = useState(false);
+  const [restSecondsLeft, setRestSecondsLeft] = useState<number | null>(null);
+  const [sessionComplete, setSessionComplete] = useState(false);
 
   useEffect(() => {
     async function fetchWorkout() {
@@ -109,6 +149,13 @@ export default function WorkoutDetailScreen({ workoutId }: { workoutId: string }
     setCoachStepId(repFirstStep?.id ?? normalizedSteps[0].id);
   }, [normalizedSteps]);
 
+  useEffect(() => {
+    if (!workoutStarted) {
+      setRestSecondsLeft(null);
+      setSessionComplete(false);
+    }
+  }, [workoutStarted]);
+
   const selectedCoachStep = useMemo(() => {
     if (coachStepId === 'auto-workout') {
       return null;
@@ -145,6 +192,80 @@ export default function WorkoutDetailScreen({ workoutId }: { workoutId: string }
     const value = Number(match[0]);
     return Number.isFinite(value) ? value : undefined;
   }, [selectedCoachStep]);
+
+  const advanceToNextStep = useCallback(() => {
+    if (!selectedCoachStep) {
+      return;
+    }
+
+    const currentIndex = normalizedSteps.findIndex((step) => step.id === selectedCoachStep.id);
+    if (currentIndex < 0) {
+      return;
+    }
+
+    const nextStep = normalizedSteps[currentIndex + 1];
+    if (!nextStep) {
+      setSessionComplete(true);
+      setRestSecondsLeft(null);
+      return;
+    }
+
+    setCoachStepId(nextStep.id);
+    setRestSecondsLeft(null);
+  }, [normalizedSteps, selectedCoachStep]);
+
+  useEffect(() => {
+    if (!workoutStarted || restSecondsLeft === null) {
+      return;
+    }
+
+    if (restSecondsLeft <= 0) {
+      advanceToNextStep();
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setRestSecondsLeft((prev) => (prev === null ? null : Math.max(prev - 1, 0)));
+    }, 1000);
+
+    return () => window.clearTimeout(timeout);
+  }, [advanceToNextStep, restSecondsLeft, workoutStarted]);
+
+  const handleTargetReached = useCallback(() => {
+    if (!selectedCoachStep || restSecondsLeft !== null) {
+      return;
+    }
+
+    const currentIndex = normalizedSteps.findIndex((step) => step.id === selectedCoachStep.id);
+    if (currentIndex < 0) {
+      return;
+    }
+
+    if (!normalizedSteps[currentIndex + 1]) {
+      setSessionComplete(true);
+      return;
+    }
+
+    const restSeconds = parseRestSeconds(selectedCoachStep.rest);
+    setRestSecondsLeft(restSeconds);
+  }, [normalizedSteps, restSecondsLeft, selectedCoachStep]);
+
+  const quality = useMemo(() => {
+    if (!workout) {
+      return null;
+    }
+
+    return evaluateWorkoutQuality(workout, steps);
+  }, [steps, workout]);
+
+  const qualityTone =
+    quality?.label === 'Excellent'
+      ? 'text-emerald-300 border-emerald-600/40 bg-emerald-950/20'
+      : quality?.label === 'Good'
+        ? 'text-green-300 border-green-600/40 bg-green-950/20'
+        : quality?.label === 'Fair'
+          ? 'text-yellow-300 border-yellow-600/40 bg-yellow-950/20'
+          : 'text-orange-300 border-orange-600/40 bg-orange-950/20';
 
   if (loading) {
     return (
@@ -243,7 +364,12 @@ export default function WorkoutDetailScreen({ workoutId }: { workoutId: string }
               <select
                 id="coachExercise"
                 value={coachStepId}
-                onChange={(event) => setCoachStepId(event.target.value)}
+                onChange={(event) => {
+                  setCoachStepId(event.target.value);
+                  setRestSecondsLeft(null);
+                  setSessionComplete(false);
+                }}
+                disabled={restSecondsLeft !== null}
                 className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500"
               >
                 <option value="auto-workout">Auto from workout title</option>
@@ -266,10 +392,75 @@ export default function WorkoutDetailScreen({ workoutId }: { workoutId: string }
               Camera coach now auto-maps AI/backend exercise names to the best free pose model strategy.
             </p>
 
-            {cameraCoachEnabled && <PoseDetector exercise={coachExercise} targetReps={targetReps} />}
+            {restSecondsLeft !== null && (
+              <div className="rounded-xl border border-yellow-600/40 bg-yellow-950/20 px-4 py-3 text-yellow-200 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">Rest time</p>
+                  <p className="text-xs text-yellow-300/80">Next exercise starts automatically.</p>
+                </div>
+                <p className="text-2xl font-bold tabular-nums">{formatClock(restSecondsLeft)}</p>
+              </div>
+            )}
+
+            {sessionComplete && (
+              <div className="rounded-xl border border-emerald-600/40 bg-emerald-950/20 px-4 py-3 text-emerald-200">
+                <p className="text-sm font-semibold">Workout track complete</p>
+                <p className="text-xs text-emerald-300/80">You finished all tracked exercises in this session.</p>
+              </div>
+            )}
+
+            {cameraCoachEnabled && restSecondsLeft === null && !sessionComplete && (
+              <PoseDetector
+                key={selectedCoachStep?.id ?? coachStepId}
+                exercise={coachExercise}
+                targetReps={targetReps}
+                onTargetReached={handleTargetReached}
+              />
+            )}
           </>
         )}
       </section>
+
+      {quality && (
+        <section className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-2xl p-6 md:p-8 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-2xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>
+              WORKOUT <span className="text-red-500">QUALITY</span>
+            </h2>
+            <div className={`px-3 py-1.5 rounded-full border text-sm font-semibold ${qualityTone}`}>
+              {quality.label} · {quality.score}/100
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div className="rounded-lg border border-gray-800 bg-black/40 px-3 py-2">
+              Warm-up: <span className={quality.checks.hasWarmup ? 'text-green-400' : 'text-red-400'}>{quality.checks.hasWarmup ? 'Yes' : 'No'}</span>
+            </div>
+            <div className="rounded-lg border border-gray-800 bg-black/40 px-3 py-2">
+              Cooldown: <span className={quality.checks.hasCooldown ? 'text-green-400' : 'text-red-400'}>{quality.checks.hasCooldown ? 'Yes' : 'No'}</span>
+            </div>
+            <div className="rounded-lg border border-gray-800 bg-black/40 px-3 py-2">
+              Rest cues: <span className={quality.checks.hasRestGuidance ? 'text-green-400' : 'text-red-400'}>{quality.checks.hasRestGuidance ? 'Yes' : 'No'}</span>
+            </div>
+            <div className="rounded-lg border border-gray-800 bg-black/40 px-3 py-2">
+              Variety: <span className="text-red-300">{quality.checks.movementVariety} groups</span>
+            </div>
+          </div>
+
+          {quality.recommendations.length > 0 ? (
+            <div className="rounded-xl border border-gray-800 bg-black/40 p-4 space-y-2">
+              <p className="text-sm font-semibold text-gray-200">Coach Suggestions</p>
+              <ul className="text-sm text-gray-400 list-disc pl-5 space-y-1">
+                {quality.recommendations.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-sm text-green-300">This plan looks well-balanced and session-ready.</p>
+          )}
+        </section>
+      )}
 
       <section>
         <h2 className="text-3xl font-bold mb-5" style={{ fontFamily: 'Oswald, sans-serif' }}>

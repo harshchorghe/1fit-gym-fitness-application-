@@ -4,11 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   getWorkouts,
+  getWorkoutDetails,
   Workout,
   addWorkout,
   addWorkoutDetails,
   WorkoutDetailInput,
 } from '@/lib/firestore/Workouts';
+import { evaluateWorkoutQuality, WorkoutQuality } from '@/lib/workoutQuality';
 import { deleteCompletedWorkout } from '@/lib/firestore/userWorkouts';
 import { auth, db } from '@/lib/firebase';
 import {
@@ -43,6 +45,8 @@ interface CompletedWorkout {
   calories: number;
   completedAt: any;
 }
+
+type CardQuality = Pick<WorkoutQuality, 'score' | 'label'>;
 
 // ─── MODAL COMPONENTS ─────────────────────────────────────────────────────
 
@@ -576,6 +580,7 @@ export default function WorkoutsScreen() {
   const [user, setUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [startStatus, setStartStatus] = useState<Record<string, 'idle' | 'loading' | 'done'>>({});
+  const [qualityByWorkoutId, setQualityByWorkoutId] = useState<Record<string, CardQuality>>({});
 
   const handleRemoveMyWorkout = async (entryId: string) => {
     if (!user?.uid) return;
@@ -611,6 +616,53 @@ export default function WorkoutsScreen() {
     }
     fetchData();
   }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadCardQuality() {
+      if (!workouts.length) {
+        if (isActive) {
+          setQualityByWorkoutId({});
+        }
+        return;
+      }
+
+      const results = await Promise.all(
+        workouts.map(async (workout) => {
+          if (!workout.id) {
+            return null;
+          }
+
+          try {
+            const steps = await getWorkoutDetails(workout.id);
+            const quality = evaluateWorkoutQuality(workout, steps);
+            return [workout.id, { score: quality.score, label: quality.label }] as const;
+          } catch {
+            return [workout.id, { score: 60, label: 'Fair' }] as const;
+          }
+        })
+      );
+
+      if (!isActive) {
+        return;
+      }
+
+      const mapped: Record<string, CardQuality> = {};
+      results.forEach((entry) => {
+        if (!entry) return;
+        mapped[entry[0]] = entry[1];
+      });
+
+      setQualityByWorkoutId(mapped);
+    }
+
+    void loadCardQuality();
+
+    return () => {
+      isActive = false;
+    };
+  }, [workouts]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -739,12 +791,32 @@ export default function WorkoutsScreen() {
           {workouts.map(w => {
             const key = w.id || 'temp';
             const status = startStatus[key] || 'idle';
+            const quality = w.id ? qualityByWorkoutId[w.id] : undefined;
+            const badgeText = quality
+              ? `${quality.label} ${quality.score}`
+              : w.id
+                ? 'Analyzing...'
+                : 'Unrated';
+            const qualityTone =
+              quality?.label === 'Excellent'
+                ? 'text-emerald-300 border-emerald-600/40 bg-emerald-950/20'
+                : quality?.label === 'Good'
+                  ? 'text-green-300 border-green-600/40 bg-green-950/20'
+                  : quality?.label === 'Fair'
+                    ? 'text-yellow-300 border-yellow-600/40 bg-yellow-950/20'
+                    : quality
+                      ? 'text-orange-300 border-orange-600/40 bg-orange-950/20'
+                      : 'text-blue-200 border-blue-600/40 bg-blue-950/30';
 
             return (
               <div
                 key={w.id}
                 className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-2xl p-6 hover:border-red-600/60 transition-all duration-300 relative overflow-hidden"
               >
+                <div className={`absolute top-4 right-4 z-10 px-2.5 py-1 rounded-full border text-xs font-semibold ${qualityTone}`}>
+                  {badgeText}
+                </div>
+
                 <h3 className="text-2xl font-bold mb-3">{w.title}</h3>
                 <p className="text-gray-400 mb-5">by {w.trainer || '—'}</p>
 

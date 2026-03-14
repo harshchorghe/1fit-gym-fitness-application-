@@ -18,6 +18,7 @@ type DetectionMode =
 type PoseDetectorProps = {
   exercise: CameraExercise;
   targetReps?: number;
+  onTargetReached?: () => void;
 };
 
 type SimpleLandmark = {
@@ -58,7 +59,7 @@ function inferDetectionMode(exerciseName: string): DetectionMode {
   return 'auto';
 }
 
-export default function PoseDetector({ exercise, targetReps }: PoseDetectorProps) {
+export default function PoseDetector({ exercise, targetReps, onTargetReached }: PoseDetectorProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -79,6 +80,7 @@ export default function PoseDetector({ exercise, targetReps }: PoseDetectorProps
   const cycleStartedAtRef = useRef<number | null>(null);
   const downFrameStreakRef = useRef(0);
   const upFrameStreakRef = useRef(0);
+  const targetReachedEmittedRef = useRef(false);
 
   const detectionMode = useMemo(() => inferDetectionMode(exercise), [exercise]);
 
@@ -94,7 +96,26 @@ export default function PoseDetector({ exercise, targetReps }: PoseDetectorProps
     cycleStartedAtRef.current = null;
     downFrameStreakRef.current = 0;
     upFrameStreakRef.current = 0;
+    targetReachedEmittedRef.current = false;
   }, [exercise]);
+
+  useEffect(() => {
+    targetReachedEmittedRef.current = false;
+  }, [targetReps]);
+
+  useEffect(() => {
+    if (!targetReps || targetReps <= 0 || targetReachedEmittedRef.current) {
+      return;
+    }
+
+    const progress = detectionMode === 'plank' ? holdSeconds : repCount;
+    if (progress < targetReps) {
+      return;
+    }
+
+    targetReachedEmittedRef.current = true;
+    onTargetReached?.();
+  }, [detectionMode, holdSeconds, onTargetReached, repCount, targetReps]);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,13 +137,8 @@ export default function PoseDetector({ exercise, targetReps }: PoseDetectorProps
     const hasGoodVisibility = (...points: Array<SimpleLandmark | null>) =>
       points.every((point) => point && (point.visibility ?? 0) > 0.6);
 
-    const noteDownProgress = (formOk: boolean) => {
-      if (formOk) {
-        downFrameStreakRef.current += 1;
-      } else {
-        downFrameStreakRef.current = 0;
-        validCycleRef.current = false;
-      }
+    const noteDownProgress = () => {
+      downFrameStreakRef.current += 1;
 
       if (downFrameStreakRef.current >= 2 && !validCycleRef.current) {
         validCycleRef.current = true;
@@ -130,8 +146,8 @@ export default function PoseDetector({ exercise, targetReps }: PoseDetectorProps
       }
     };
 
-    const noteUpProgressAndCount = (formOk: boolean) => {
-      if (formOk && validCycleRef.current) {
+    const noteUpProgressAndCount = () => {
+      if (validCycleRef.current) {
         upFrameStreakRef.current += 1;
       } else {
         upFrameStreakRef.current = 0;
@@ -291,11 +307,11 @@ export default function PoseDetector({ exercise, targetReps }: PoseDetectorProps
 
         if (isClosed && jackPhaseRef.current === 'open') {
           jackPhaseRef.current = 'closed';
-          noteUpProgressAndCount(true);
+          noteUpProgressAndCount();
         }
 
         if (isOpen) {
-          noteDownProgress(true);
+          noteDownProgress();
           updateFeedback('Great extension, return under control');
         } else {
           updateFeedback('Open arms and legs wider each rep');
@@ -322,12 +338,12 @@ export default function PoseDetector({ exercise, targetReps }: PoseDetectorProps
         }
 
         if (phaseRef.current === 'down') {
-          noteDownProgress(formOk && elbowAngle < 95);
+          noteDownProgress();
         }
 
         if (elbowAngle > 155 && phaseRef.current === 'down') {
           phaseRef.current = 'up';
-          noteUpProgressAndCount(formOk && elbowAngle > 155);
+          noteUpProgressAndCount();
         }
 
         if (!formOk) {
@@ -363,12 +379,12 @@ export default function PoseDetector({ exercise, targetReps }: PoseDetectorProps
         }
 
         if (phaseRef.current === 'down') {
-          noteDownProgress(formOk && kneeAngle < 100);
+          noteDownProgress();
         }
 
         if (kneeAngle > 160 && phaseRef.current === 'down') {
           phaseRef.current = 'up';
-          noteUpProgressAndCount(formOk && kneeAngle > 160);
+          noteUpProgressAndCount();
         }
 
         if (mode === 'lunge') {
@@ -414,12 +430,12 @@ export default function PoseDetector({ exercise, targetReps }: PoseDetectorProps
         }
 
         if (phaseRef.current === 'down') {
-          noteDownProgress(formOk && hipAngle < 95);
+          noteDownProgress();
         }
 
         if (hipAngle > 145 && phaseRef.current === 'down') {
           phaseRef.current = 'up';
-          noteUpProgressAndCount(formOk && hipAngle > 145);
+          noteUpProgressAndCount();
         }
 
         if (!formOk) {
