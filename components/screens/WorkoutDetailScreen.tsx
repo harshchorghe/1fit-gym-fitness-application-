@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import PoseDetector from '@/components/PoseDetector';
 import {
   getWorkoutById,
   getWorkoutDetails,
@@ -56,6 +57,8 @@ export default function WorkoutDetailScreen({ workoutId }: { workoutId: string }
   const [steps, setSteps] = useState<WorkoutDetailStep[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [workoutStarted, setWorkoutStarted] = useState(false);
+  const [cameraCoachEnabled, setCameraCoachEnabled] = useState(false);
 
   useEffect(() => {
     async function fetchWorkout() {
@@ -93,6 +96,55 @@ export default function WorkoutDetailScreen({ workoutId }: { workoutId: string }
       })),
     [steps]
   );
+
+  const [coachStepId, setCoachStepId] = useState<string>('auto-workout');
+
+  useEffect(() => {
+    if (normalizedSteps.length === 0) {
+      setCoachStepId('auto-workout');
+      return;
+    }
+
+    const repFirstStep = normalizedSteps.find((step) => /\d+/.test(step.reps));
+    setCoachStepId(repFirstStep?.id ?? normalizedSteps[0].id);
+  }, [normalizedSteps]);
+
+  const selectedCoachStep = useMemo(() => {
+    if (coachStepId === 'auto-workout') {
+      return null;
+    }
+
+    return normalizedSteps.find((step) => step.id === coachStepId) ?? null;
+  }, [coachStepId, normalizedSteps]);
+
+  const coachExercise = useMemo(() => {
+    if (selectedCoachStep) {
+      const tokens = [selectedCoachStep.name, selectedCoachStep.move, selectedCoachStep.tip]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+
+      if (tokens) {
+        return tokens;
+      }
+    }
+
+    return `${workout?.title ?? 'General'} workout`;
+  }, [selectedCoachStep, workout?.title]);
+
+  const targetReps = useMemo(() => {
+    if (!selectedCoachStep) {
+      return undefined;
+    }
+
+    const match = selectedCoachStep.reps.match(/\d+/);
+    if (!match) {
+      return undefined;
+    }
+
+    const value = Number(match[0]);
+    return Number.isFinite(value) ? value : undefined;
+  }, [selectedCoachStep]);
 
   if (loading) {
     return (
@@ -152,6 +204,72 @@ export default function WorkoutDetailScreen({ workoutId }: { workoutId: string }
           </div>
         </div>
       </header>
+
+      <section className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-2xl p-6 md:p-8 space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-2xl font-bold" style={{ fontFamily: 'Oswald, sans-serif' }}>
+            WORKOUT <span className="text-red-500">SESSION</span>
+          </h2>
+          {!workoutStarted ? (
+            <button
+              onClick={() => {
+                setWorkoutStarted(true);
+                setCameraCoachEnabled(true);
+              }}
+              className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-xl font-semibold transition-colors"
+            >
+              Start Workout
+            </button>
+          ) : (
+            <button
+              onClick={() => setWorkoutStarted(false)}
+              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-semibold transition-colors"
+            >
+              End Session
+            </button>
+          )}
+        </div>
+
+        {!workoutStarted ? (
+          <p className="text-sm text-gray-400">
+            Start session to enable camera rep counting and posture feedback.
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-3">
+              <label htmlFor="coachExercise" className="text-sm text-gray-300">
+                Track step:
+              </label>
+              <select
+                id="coachExercise"
+                value={coachStepId}
+                onChange={(event) => setCoachStepId(event.target.value)}
+                className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500"
+              >
+                <option value="auto-workout">Auto from workout title</option>
+                {normalizedSteps.map((step) => (
+                  <option key={step.id} value={step.id}>
+                    {step.displayOrder}. {step.name} ({step.reps})
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => setCameraCoachEnabled((prev) => !prev)}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm font-medium transition-colors"
+              >
+                {cameraCoachEnabled ? 'Hide Camera Coach' : 'Show Camera Coach'}
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500">
+              Camera coach now auto-maps AI/backend exercise names to the best free pose model strategy.
+            </p>
+
+            {cameraCoachEnabled && <PoseDetector exercise={coachExercise} targetReps={targetReps} />}
+          </>
+        )}
+      </section>
 
       <section>
         <h2 className="text-3xl font-bold mb-5" style={{ fontFamily: 'Oswald, sans-serif' }}>

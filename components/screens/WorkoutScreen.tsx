@@ -60,6 +60,7 @@ function CategoryDetailView({ category }: { category: Category }) {
 }
 
 function WorkoutDetailView({ workout, onClose }: { workout: Workout; onClose?: () => void }) {
+  const router = useRouter();
   const [started, setStarted] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
@@ -118,10 +119,22 @@ function WorkoutDetailView({ workout, onClose }: { workout: Workout; onClose?: (
           {isStarting ? '⏳ STARTING WORKOUT...' : '🏋️ START WORKOUT'}
         </button>
       ) : (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6 text-center">
-          <div className="text-4xl mb-2">🎉</div>
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6 text-center space-y-4">
+          <div className="text-4xl">🎉</div>
           <h3 className="font-bold text-green-400 text-lg">Workout Started!</h3>
           <p className="text-gray-400 text-sm mt-1">Your {workout.title} session is now active. Let's go!</p>
+
+          {workout.id && (
+            <button
+              onClick={() => {
+                onClose?.();
+                router.push(`/home/workouts/${workout.id}`);
+              }}
+              className="w-full bg-red-600 hover:bg-red-700 py-2.5 rounded-lg font-semibold transition-colors"
+            >
+              Open Camera Coach
+            </button>
+          )}
         </div>
       )}
     </div>
